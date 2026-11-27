@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Moderator&#39;s Desk</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* Layout: a rainy night-shift desk. Dark only, by choice (moodboard: "cold, rainy and blue as the stakes rise").
+   Sticky status bar; screens swap below. Case screen = inbox + meters | IM window | decision. */
+@property --glow{syntax:"<color>";inherits:true;initial-value:rgba(255,230,207,.10)}
+:root{
+  color-scheme:dark;
+  /* moodboard palette */
+  --navy:#1F3470; --sage:#7F9C8B; --cream:#FFE6CF; --char:#1B1F22; --teal:#0E4A55;
+  /* surfaces */
+  --bg:#10161a; --panel:#152027; --sunk:#0f171c; --raise:#1b2a31; --line:#2a3c43; --line2:#4a6068;
+  --ink:#ece5da; --muted:#98a89f; --accent:#FFE6CF; --accent-ink:#1B1F22; --link:#a9c4b4;
+  /* calls (semantic, kept apart from the palette accents) */
+  --report:#ec8a73; --escalate:#e6bd70; --ignore:#aab6b0; --ok:#93c9a6; --police:#7d97ea;
+  --report-bg:#2d1d1b; --escalate-bg:#2b2519; --ok-bg:#15291f; --ignore-bg:#1b252a;
+  /* IM window */
+  --win-title:#1F3470; --win-body:#f1ebe1; --win-ink:#1B1F22; --win-user:#1F3470; --win-bot:#a3352b; --win-muted:#6f7576;
+  /* meters */
+  --m-safety:#7F9C8B; --m-trust:#FFE6CF; --m-cred:#6d86dc;
+  --shadow:#070b0d;
+  --f-pixel:"Pixelify Sans","Space Mono",ui-monospace,monospace;
+  --f-mono:"Space Mono",ui-monospace,Menlo,Consolas,monospace;
+  --f-display:var(--f-pixel); --f-body:var(--f-mono);
+  --glow:rgba(255,230,207,.10);
+  transition:--glow 1.6s ease;
+}
+:root[data-stakes="1"]{--glow:rgba(127,156,139,.16)}
+:root[data-stakes="2"]{--glow:rgba(14,74,85,.42)}
+:root[data-stakes="3"]{--glow:rgba(31,52,112,.48)}
+:root[data-stakes="4"]{--glow:rgba(31,52,112,.62)}
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+img{max-width:100%}
+/* bottom padding leaves room for the viewer's own sign-in bar so it never covers buttons */
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 140px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+#mood{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 80% 60% at 78% -8%,var(--glow),transparent 70%),radial-gradient(ellipse 60% 50% at 0% 110%,var(--glow),transparent 70%)}
+.wrap{max-width:1240px;margin:0 auto;position:relative;z-index:1}
+h1,h2,h3{font-family:var(--f-pixel);font-weight:600;line-height:1.08;text-wrap:balance;margin:0;letter-spacing:.01em}
+p{margin:0}
+a{color:var(--link)}
+.label{font-family:var(--f-mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+button,input{font:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--cream);outline-offset:3px}
+/* pixel buttons: square, hard offset shadow, pressed state sinks */
+.primary,.ghost,.dbtn,.hintbtn,.sbtoggle,.sndbtn,.cpbtn{border-radius:0;box-shadow:3px 3px 0 var(--shadow);transition:transform .06s,box-shadow .06s,border-color .15s,background .15s}
+.primary:active,.ghost:active,.dbtn:active,.hintbtn:active,.sbtoggle:active,.sndbtn:active,.cpbtn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--shadow)}
+.primary{background:var(--cream);color:var(--accent-ink);border:2px solid var(--cream);padding:12px 22px;font-weight:700;font-size:15px}
+.primary:hover{background:#fff2e5}
+.ghost{background:var(--panel);color:var(--ink);border:2px solid var(--line2);padding:10px 18px;font-weight:700;font-size:15px}
+.ghost:hover{border-color:var(--cream)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.note{font-size:13px;color:var(--muted)}
+.mono{font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums}
+.tag{font-family:var(--f-mono);font-size:11px;font-weight:700;letter-spacing:.06em;padding:2px 8px;white-space:nowrap;display:inline-block;border:1px solid currentColor}
+.tag.report{color:var(--report)} .tag.escalate{color:var(--escalate)} .tag.ignore{color:var(--ignore)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px}
+
+/* status bar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;padding-block:14px;margin-bottom:28px}
+.brand{font-family:var(--f-pixel);font-weight:700;font-size:24px;background:none;border:0;color:var(--cream);padding:0;letter-spacing:.02em}
+.brand span{font-family:var(--f-mono);color:var(--muted);font-weight:400;font-size:12px;letter-spacing:.16em;text-transform:uppercase;margin-left:6px}
+.barright{display:flex;gap:14px;align-items:center;margin-left:auto;flex-wrap:wrap}
+.queue{display:flex;gap:4px}
+.pip{width:14px;height:14px;background:var(--line);border:1px solid var(--line2)}
+.pip.cur{background:var(--cream);border-color:var(--cream)} .pip.good{background:var(--ok);border-color:var(--ok)} .pip.ok{background:var(--ignore);border-color:var(--ignore)}
+.pip.false{background:var(--escalate);border-color:var(--escalate)} .pip.missed,.pip.late{background:var(--report);border-color:var(--report)}
+.scorepill{font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums;border:1px solid var(--line2);padding:3px 10px}
+.scorepill b{color:var(--cream)}
+.sndbtn{background:transparent;border:1px solid var(--line2);color:var(--muted);padding:3px 0;width:calc(10ch + .8em + 24px);text-align:center;white-space:nowrap;font-size:12px;letter-spacing:.08em;font-family:var(--f-mono)}
+.sndbtn[aria-pressed="true"]{color:var(--cream);border-color:var(--cream)}
+.bump{animation:bump .5s steps(3)}
+@keyframes bump{40%{transform:scale(1.15)}}
+.tstrip{flex-basis:100%;display:grid;gap:6px}
+.tstrip .tl{display:flex;justify-content:space-between;gap:10px}
+.tbar{height:8px;background:var(--sunk);border:1px solid var(--line);overflow:hidden}
+.tbar i{display:block;height:100%;background:var(--sage);transition:width 1s steps(8)}
+.tstrip.low .tbar i{background:var(--report)}
+.tstrip.low .mono{color:var(--report)}
+@media (prefers-reduced-motion:no-preference){.tstrip.low .mono{animation:blink 1s steps(2) infinite}}
+@keyframes blink{50%{opacity:.25}}
+.sb-strip{flex-basis:100%;display:flex;align-items:center;gap:8px 16px;border-top:1px solid var(--line);padding-top:10px;position:relative}
+.sb-strip .label{white-space:nowrap}
+.sb-top{display:flex;gap:6px 18px;flex:1 1 auto;min-width:0;flex-wrap:wrap;font-size:13px}
+.sb-top span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+.sb-top .r{color:var(--muted);margin-right:4px}
+.sb-top .s{color:var(--cream);margin-left:6px;font-variant-numeric:tabular-nums}
+.sb-top .me{color:var(--cream)}
+.sbtoggle{background:transparent;border:1px solid var(--line2);color:var(--ink);padding:3px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+.sbtoggle:hover{border-color:var(--cream)}
+.sbpanel{position:absolute;right:0;top:calc(100% + 8px);width:min(380px,100%);z-index:6;box-shadow:6px 6px 0 var(--shadow)}
+
+/* landing */
+.hero{display:grid;grid-template-columns:1fr 1.05fr;gap:40px;align-items:center}
+.hero>*{min-width:0}
+.hero h1{font-size:clamp(44px,6.2vw,80px);font-weight:700;color:var(--cream)}
+.hero h1 em{font-style:normal;color:var(--sage)}
+.hero .row{margin-top:28px}
+.lede{font-size:16px;max-width:44ch;margin-top:18px;color:var(--ink)}
+.scenebox{position:relative;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--char);aspect-ratio:5/3}
+.scenebox canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+.scenebox .cap{position:absolute;left:14px;bottom:12px;font-family:var(--f-mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--cream);text-shadow:1px 1px 0 var(--shadow)}
+.more{margin-top:56px;display:grid;gap:16px}
+.more h2{font-size:clamp(26px,3.2vw,34px);color:var(--cream)}
+.levels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
+.lv{text-align:left;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:16px;display:grid;gap:4px;transition:border-color .2s}
+.lv:hover,.lv:focus-visible,.lv[aria-expanded="true"]{border-color:var(--sage)}
+.lv b{font-family:var(--f-pixel);font-size:22px;font-weight:600;color:var(--cream)}
+.lv .meta{font-size:12px;color:var(--muted)}
+.lv-more{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows .3s ease,opacity .3s ease}
+.lv-more>div{overflow:hidden;font-size:14px;color:var(--ink)}
+.lv-more p{padding-top:8px}
+.lv:hover .lv-more,.lv:focus-visible .lv-more,.lv[aria-expanded="true"] .lv-more{grid-template-rows:1fr;opacity:1}
+@media (hover:none){.lv-more{grid-template-rows:1fr;opacity:1}}
+.argument{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px 20px;display:grid;gap:6px}
+.argument p{font-size:15px;max-width:72ch}
+
+/* digits inside pixel-font text use the mono face: the pixel 5 reads like an S */
+.dg{font-family:var(--f-mono);font-weight:700;font-size:.92em;letter-spacing:0}
+
+/* level intro */
+.intro{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr);gap:32px;align-items:start}
+.intro>*{min-width:0}
+.intro .col{display:grid;gap:18px}
+.intro h1{font-size:clamp(40px,5.6vw,68px);font-weight:700;color:var(--cream)}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.fact{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px}
+.fact .n{font-family:var(--f-mono);font-size:30px;font-weight:700;line-height:1;color:var(--cream)}
+.points{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px}
+.points .mono{text-align:right}
+
+/* case: inbox + meters | IM window | decision */
+.casehead{display:flex;flex-wrap:wrap;align-items:end;gap:10px 20px;margin-bottom:16px}
+.casehead h2{font-size:clamp(26px,3.2vw,36px);color:var(--cream)}
+.grid{display:grid;grid-template-columns:230px minmax(0,1.25fr) minmax(0,1fr);grid-template-areas:"side chat act";gap:18px;align-items:start}
+.grid>*{min-width:0}
+.leftcol{grid-area:side;display:grid;gap:14px}
+.midcol{grid-area:chat;display:grid;gap:14px}
+.side{grid-area:act;padding:16px;display:grid;gap:18px}
+.inbox{padding:14px;display:grid;gap:8px}
+.ibx{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:13px}
+.ibx li{display:flex;justify-content:space-between;gap:8px;padding:5px 8px;border:1px solid transparent}
+.ibx li .st{color:var(--muted)}
+.ibx li.cur{border-color:var(--cream);background:var(--sunk)} .ibx li.cur .st{color:var(--cream)}
+.ibx li.report .st{color:var(--report)} .ibx li.escalate .st{color:var(--escalate)} .ibx li.ignore .st{color:var(--ignore)}
+.meters{padding:14px;display:grid;gap:12px}
+.mtr{display:grid;gap:5px}
+.mtr .mh{display:flex;justify-content:space-between;font-size:12px}
+.mtr .d{font-size:11px;font-weight:700}
+.mtr .d.up{color:var(--ok)} .mtr .d.down{color:var(--report)}
+.mbar{height:10px;background:var(--sunk);border:1px solid var(--line)}
+.mbar i{display:block;height:100%;transition:width .8s steps(10)}
+.mtr.safety i{background:var(--m-safety)} .mtr.trust i{background:var(--m-trust)} .mtr.cred i{background:var(--m-cred)}
+.meters.wide{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+
+/* retro instant-message window */
+.im{background:var(--win-body);color:var(--win-ink);border:2px solid var(--win-title);box-shadow:4px 4px 0 var(--shadow);border-radius:2px}
+.im-title{background:var(--win-title);color:var(--cream);font-family:var(--f-pixel);font-size:15px;padding:6px 10px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.im-title .x{display:flex;gap:4px}
+.im-title .x i{width:12px;height:12px;border:2px solid var(--cream);display:block}
+.im-body{margin:8px;border:2px solid #c9c2b6;border-right-color:#fff;border-bottom-color:#fff;background:#f7f2ea;padding:14px 16px;min-height:220px;display:flex;flex-direction:column;gap:6px;font-family:var(--f-pixel);font-size:17px;line-height:1.4}
+.line .h{font-weight:600;margin-right:6px}
+.line.u .h{color:var(--win-user)} .line.a .h{color:var(--win-bot)}
+.line.unread{opacity:.55}
+.typing{color:var(--win-muted);font-size:15px;display:flex;align-items:center;gap:10px}
+.bubble{position:relative;display:inline-flex;gap:5px;background:var(--cream);border:2px solid var(--win-title);padding:6px 10px}
+.bubble::after{content:"";position:absolute;left:8px;bottom:-8px;border:6px solid transparent;border-top-color:var(--win-title);border-bottom:0}
+.bubble i{width:7px;height:7px;background:var(--win-ink);display:block}
+@media (prefers-reduced-motion:no-preference){.bubble i{animation:dot 1s steps(2) infinite}.bubble i:nth-child(2){animation-delay:.2s}.bubble i:nth-child(3){animation-delay:.4s}}
+@keyframes dot{50%{transform:translateY(-3px)}}
+.cutnote{font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--win-muted);border-top:1px dashed #b9b2a6;padding-top:6px;margin-top:4px}
+.checkpoint{background:var(--char);color:var(--ink);border:2px solid var(--cream);margin-top:8px;padding:12px 14px;display:grid;gap:8px;font-family:var(--f-mono)}
+.checkpoint b{font-family:var(--f-pixel);font-size:20px;color:var(--cream);font-weight:600}
+.cpbtn{background:var(--panel);color:var(--ink);border:2px solid var(--line2);padding:6px 14px;font-size:13px;font-weight:700}
+.cpbtn.go{background:var(--cream);color:var(--accent-ink);border-color:var(--cream)}
+.flagbox{padding:12px 14px;display:grid;gap:6px;border-style:dashed}
+.meter{height:8px;background:var(--sunk);border:1px solid var(--line)}
+.meter i{display:block;height:100%;background:var(--report)}
+.ask{display:grid;gap:10px}
+.qs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.q{border:1px solid var(--line);padding:9px 11px;display:grid;gap:2px;background:var(--sunk)}
+.q b{font-family:var(--f-pixel);font-size:17px;font-weight:600;color:var(--cream)}
+.q small{color:var(--muted);font-size:12px;line-height:1.4}
+.q .v{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
+.q.yes{border-color:var(--report)} .q.yes .v{color:var(--report)}
+.q.unclear{border-color:var(--escalate)} .q.unclear .v{color:var(--escalate)}
+.q.no .v{color:var(--ok)}
+.hintbtn{justify-self:start;background:transparent;border:1px dashed var(--cream);color:var(--cream);padding:6px 12px;font-weight:700;font-size:13px}
+.hintbtn[disabled]{opacity:.5;cursor:default;transform:none;box-shadow:none}
+.hintrow{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.tier{font-size:10px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line2);padding:2px 7px;color:var(--muted)}
+.tier.free{color:var(--ok);border-color:var(--ok)} .tier.mid{color:var(--cream);border-color:var(--cream)} .tier.hard{color:var(--escalate);border-color:var(--escalate)}
+.hintrule{font-size:13px;background:var(--raise);padding:8px 12px;border-left:0}
+.history{font-size:13px;padding:10px 12px;background:var(--sunk);border:1px solid var(--line)}
+.decide{display:grid;gap:10px}
+.dbtn{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;padding:12px 14px;background:var(--sunk);color:var(--ink);border:2px solid var(--line2);font-family:var(--f-mono);font-size:19px;font-weight:400}
+.dbtn .lbl{display:flex;align-items:center;gap:12px}
+.dbtn .sq{width:12px;height:12px;flex:none}
+.dbtn.report .sq{background:var(--report)} .dbtn.escalate .sq{background:var(--escalate)} .dbtn.ignore .sq{background:var(--ignore)}
+.dbtn small{display:block;font-size:12px;color:var(--muted)}
+.dbtn kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line2);padding:1px 6px;color:var(--muted)}
+.dbtn:hover{border-color:var(--cream);background:var(--raise)}
+
+/* briefing */
+.brief{max-width:880px;display:grid;gap:22px}
+.bhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.steps{display:flex;gap:6px;max-width:320px;flex:1 1 200px}
+.steps i{height:8px;flex:1;background:var(--line)}
+.steps i.on{background:var(--cream)}
+.big{font-family:var(--f-mono);font-size:clamp(72px,11vw,128px);font-weight:700;letter-spacing:-.03em;line-height:.85;color:var(--sage);font-variant-numeric:tabular-nums}
+.brief h1{font-size:clamp(32px,4.6vw,52px);color:var(--cream)}
+.brief .body{font-size:16px;max-width:62ch}
+.src{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
+.src a{color:var(--muted)}
+.duty{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.duty div{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;display:grid;gap:4px}
+.duty b{font-family:var(--f-pixel);font-size:20px;font-weight:600;color:var(--cream)}
+.duty .y{font-size:11px;color:var(--ok)}
+.duty .no{font-size:11px;color:var(--report)}
+.duty div.ai{border-color:var(--report)}
+.timeline{display:grid;gap:10px}
+.tl-row{display:grid;grid-template-columns:140px 1fr;gap:16px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px}
+.tl-row .when{font-size:12px;color:var(--muted)}
+.tl-row.last{border-color:var(--report)}
+
+/* tutorial coach */
+.coach{background:var(--raise);border:2px solid var(--cream);padding:14px 16px;margin-bottom:18px;display:grid;gap:10px;box-shadow:4px 4px 0 var(--shadow)}
+.coach p{font-size:15px;max-width:72ch}
+.spot{outline:3px solid var(--cream);outline-offset:4px}
+
+/* outcome */
+.outcome{display:grid;grid-template-columns:110px 1fr;gap:16px;padding:16px;border:2px solid;box-shadow:4px 4px 0 var(--shadow)}
+.outcome>*{min-width:0}
+.outcome.good{background:var(--ok-bg);border-color:var(--ok)}
+.outcome.ok{background:var(--ignore-bg);border-color:var(--ignore)}
+.outcome.false{background:var(--escalate-bg);border-color:var(--escalate)}
+.outcome.missed,.outcome.late{background:var(--report-bg);border-color:var(--report)}
+.scene svg{width:110px;height:110px;display:block;shape-rendering:crispEdges}
+.ocopy{display:grid;gap:9px;align-content:start}
+.stamp{justify-self:start;font-family:var(--f-pixel);font-weight:700;font-size:16px;letter-spacing:.08em;text-transform:uppercase;padding:2px 10px;border:2px solid currentColor;transform:rotate(-3deg)}
+.good .stamp{color:var(--ok)} .ok .stamp{color:var(--ignore)} .false .stamp{color:var(--escalate)}
+.missed .stamp,.late .stamp{color:var(--report)}
+.outcome h3{font-size:24px;color:var(--cream)}
+.outcome p{font-size:14px}
+.pts{font-size:13px;font-weight:700}
+.pts.plus{color:var(--ok)} .pts.minus{color:var(--report)}
+.argnote{font-size:12px;border-top:1px solid var(--line);padding-top:10px;color:var(--muted)}
+.argnote b{color:var(--ink);font-weight:700}
+.timeout{font-size:12px;color:var(--report)}
+
+/* scene art (pixel-crisp) */
+.s-fill{fill:var(--sunk)} .s-line{fill:none;stroke:var(--ink);stroke-width:4;stroke-linecap:square;stroke-linejoin:miter}
+.s-ok{fill:none;stroke:var(--ok);stroke-width:8;stroke-linecap:square;stroke-linejoin:miter}
+.s-shield{fill:var(--ok-bg);stroke:var(--ok);stroke-width:4}
+.s-red{fill:var(--report)} .s-blue{fill:var(--police)} .s-amber{fill:var(--escalate)} .s-grey{fill:var(--ignore)}
+.s-ring{fill:none;stroke:var(--report);stroke-width:3}
+.s-door{fill:var(--raise);stroke:var(--ignore);stroke-width:3}
+@media (prefers-reduced-motion:no-preference){
+  .s-ok{stroke-dasharray:80;stroke-dashoffset:80;animation:draw .6s .25s steps(6) forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  .s-red.flash{animation:lr .5s steps(2) infinite alternate}
+  .s-blue.flash{animation:lr .5s .25s steps(2) infinite alternate}
+  @keyframes lr{from{opacity:1}to{opacity:.15}}
+  .s-ring{transform-origin:60px 62px;animation:ring 1.6s steps(6) infinite}
+  .s-ring.r2{animation-delay:.8s}
+  @keyframes ring{from{transform:scale(.6);opacity:1}to{transform:scale(1.5);opacity:0}}
+  .s-sand{transform-origin:60px 60px;animation:sand 1.4s steps(3) infinite}
+  @keyframes sand{50%{opacity:.3}}
+  .s-hand{transform-origin:60px 60px;animation:spin 3s steps(12) infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .stamp{animation:stamp .3s steps(4) both}
+  @keyframes stamp{from{transform:rotate(-3deg) scale(1.8);opacity:0}}
+  .enter{animation:rise .3s steps(4) both}
+  @keyframes rise{from{transform:translateY(8px)}}
+  .shake{animation:shake .4s steps(6)}
+  @keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+}
+/* lighting shift: warm glow after a good call, cold wash after a bad one */
+#flash{position:fixed;inset:0;pointer-events:none;z-index:20;opacity:0}
+#flash.good{background:radial-gradient(ellipse at 50% 40%,rgba(255,230,207,.22),transparent 65%);box-shadow:inset 0 0 120px rgba(255,230,207,.28)}
+#flash.bad{background:linear-gradient(rgba(14,74,85,.38),rgba(31,52,112,.42));box-shadow:inset 0 0 160px rgba(10,20,40,.8)}
+@media (prefers-reduced-motion:no-preference){#flash.go{animation:fl 1.3s ease-out}@keyframes fl{0%{opacity:1}100%{opacity:0}}}
+@media (prefers-reduced-motion:reduce){#flash.go{opacity:.6;transition:opacity 1.2s}}
+
+/* level done / final */
+.done{display:grid;gap:22px}
+.done h1{font-size:clamp(36px,5.2vw,60px);color:var(--cream)}
+.stars{display:flex;gap:10px}
+.star{width:48px;height:48px;shape-rendering:crispEdges}
+.star path{fill:var(--line)}
+.star.on path{fill:var(--cream)}
+@media (prefers-reduced-motion:no-preference){.star.on{animation:pop .4s steps(4) both}.star.on:nth-child(2){animation-delay:.15s}.star.on:nth-child(3){animation-delay:.3s}@keyframes pop{from{transform:scale(0)}}}
+.split{display:grid;grid-template-columns:1.2fr 1fr;gap:20px;align-items:start}
+.split>*{min-width:0}
+.calls{display:grid;gap:8px}
+.call{display:flex;justify-content:space-between;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);padding:10px 14px;flex-wrap:wrap;font-size:14px}
+.call .k{font-size:11px;font-weight:700;letter-spacing:.08em}
+.k.good{color:var(--ok)} .k.ok{color:var(--ignore)} .k.false{color:var(--escalate)} .k.missed,.k.late{color:var(--report)}
+.tally{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px}
+.tile .n{font-family:var(--f-mono);font-size:40px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.tile.g .n{color:var(--ok)} .tile.m .n{color:var(--report)} .tile.f .n{color:var(--escalate)} .tile.s .n{color:var(--cream)}
+.rule{background:var(--panel);border:2px solid var(--cream);padding:22px;box-shadow:5px 5px 0 var(--shadow)}
+.rule h2{font-size:28px;margin:6px 0 8px;color:var(--cream)}
+.rule p{font-size:15px;max-width:72ch}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;min-width:680px;font-size:13px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+tr:last-child td{border-bottom:0}
+.args{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.arg{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px;display:grid;gap:8px;align-content:start}
+.arg h3{font-size:20px;color:var(--cream)}
+.arg p{font-size:13px}
+.arg .seen{font-size:12px;color:var(--muted)}
+.close{font-family:var(--f-pixel);font-size:22px;line-height:1.35;max-width:60ch;color:var(--cream)}
+.epi{display:grid;gap:14px}
+.epi h2{font-size:clamp(28px,3.4vw,38px);color:var(--cream)}
+.episum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.episum div{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;display:grid;gap:4px}
+.episum .n{font-family:var(--f-mono);font-size:36px;font-weight:700;line-height:1}
+.episum .harm .n{color:var(--report)} .episum .fr .n{color:var(--escalate)} .episum .safe .n{color:var(--ok)}
+.epgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.epc{background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--line);padding:14px 16px;display:grid;gap:8px;align-content:start}
+.epc.harm{border-top-color:var(--report)} .epc.fr{border-top-color:var(--escalate)} .epc.safe{border-top-color:var(--ok)}
+.epc .who{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+.epc b{font-family:var(--f-pixel);font-size:20px;font-weight:600;color:var(--cream)}
+.epc p{font-size:13px}
+.epc .k{font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+.epc.harm .k{color:var(--report)} .epc.fr .k{color:var(--escalate)} .epc.safe .k{color:var(--ok)}
+
+/* scoreboard */
+.board{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px;display:grid;gap:12px}
+.board h3{font-size:22px;color:var(--cream)}
+.sb-list{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.sb-list li{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:7px 10px;background:var(--sunk);font-variant-numeric:tabular-nums;font-size:13px}
+.sb-list li.me{outline:2px solid var(--cream)}
+.sb-list .rk{color:var(--muted)}
+.sb-list .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.sb-list .sc{color:var(--cream)}
+.sb-list .lvl{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
+.post{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.post .field{display:grid;gap:4px;flex:1 1 160px;min-width:0}
+.post input{background:var(--sunk);border:2px solid var(--line2);color:var(--ink);border-radius:0;padding:9px 12px;width:100%}
+.postmsg{font-size:13px;color:var(--muted);flex-basis:100%}
+
+@media (max-width:1060px){
+  .grid{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);grid-template-areas:"chat act" "side act"}
+  .leftcol{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:880px){
+  .hero,.split,.intro{grid-template-columns:1fr}
+  .grid{grid-template-columns:1fr;grid-template-areas:"chat" "act" "side"}
+  .args,.epgrid{grid-template-columns:1fr}
+  .duty{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tally{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .barright{margin-left:0}
+  .levels{grid-template-columns:1fr}
+}
+@media (max-width:520px){
+  .qs,.facts,.episum,.leftcol,.meters.wide{grid-template-columns:1fr}
+  .tl-row{grid-template-columns:1fr;gap:4px}
+  .sb-top span:nth-child(n+2){display:none}
+  .sb-strip>.label{display:none}
+  .sb-top{flex-basis:0}
+  .sb-top span{max-width:100%}
+  .brand span{display:none}
+  .outcome{grid-template-columns:1fr}
+  .im-body{font-size:16px;padding:12px}
+}
+</style>
+</head>
+<body>
+<div id="mood"></div>
+<div id="flash"></div>
+<div class="wrap">
+  <header class="bar">
+    <button class="brand" id="home" title="Back to start">Moderator's Desk <span>· Trust &amp; Safety queue</span></button>
+    <div class="barright">
+      <span class="label" id="lvlname"></span>
+      <div class="queue" id="queue" aria-label="Queue progress"></div>
+      <button class="sndbtn" id="snd" aria-pressed="false" title="Rain and ambient sound">sound: off</button>
+      <span class="scorepill" id="scorepill" hidden>Score <b id="score">0</b></span>
+    </div>
+    <div class="tstrip" id="tstrip" hidden>
+      <div class="tl"><span class="label">Time left on this chat</span><span class="mono" id="tleft"></span></div>
+      <div class="tbar"><i id="tbar" style="width:100%"></i></div>
+    </div>
+    <div class="sb-strip">
+      <span class="label">Top scores</span>
+      <div class="sb-top" id="sbtop"></div>
+      <button class="sbtoggle" id="sbtoggle" aria-expanded="false" aria-controls="sbpanel">Full board</button>
+      <div class="sbpanel board" id="sbpanel" hidden>
+        <div class="row" style="justify-content:space-between"><h3>Scoreboard</h3><span class="label sb-mode"></span></div>
+        <ol class="sb-list"></ol>
+        <p class="note sb-note"></p>
+      </div>
+    </div>
+  </header>
+  <main id="app"></main>
+</div>
+
+<script>
+/* ---------- content ---------- */
+const ARGS = {
+  1:{title:"Young people confide in AI, and no one requires it to act",
+     body:"Teens tell AI things they won't tell adults. A therapist or teacher who heard the same thing would be required to report it. An AI company is not."},
+  2:{title:"Banning a user doesn't remove the danger",
+     body:"A ban closes an account. The person and the plan are still there. A company that knows about a threat and stays silent shares responsibility."},
+  3:{title:"The law can be built safely",
+     body:"Reporting duties already exist for doctors, teachers and therapists. A high threshold (clear intent and planning) protects the privacy of everyone else."}
+};
+const QS = {
+  intent:["Intent","Did they say they want to hurt people?"],
+  plan:["Plan","Have they taken real steps?"],
+  target:["Target","Is there a real person or place?"],
+  timeline:["Timeline","Is there a date or time?"]
+};
+const V_LABEL = {yes:"Clear", unclear:"Unclear", no:"None"};
+const CHOICES = {
+  report:{label:"Report to police",sub:"Send the chat to law enforcement now",key:"R"},
+  escalate:{label:"Escalate",sub:"Senior team reviews, user gets support",key:"E"},
+  ignore:{label:"Ignore",sub:"Close the flag, no action",key:"I"}
+};
+const STAMP = {good:"Right call", ok:"Costly call", false:"False report", missed:"Missed warning", late:"Too late"};
+const PTS = {good:100, ok:25, false:-50, late:-75, missed:-100};
+function hintTier(){
+  if(ctx.mode==="tutorial") return {cost:0,full:true,rule:true,cls:"free",tag:"Free in training",btn:"Show hint (free)"};
+  const s=run.score;
+  if(s<100) return {cost:0,full:true,rule:true,cls:"free",tag:"Score under 100: free, full detail",btn:"Show hint (free)"};
+  if(s<400) return {cost:25,full:true,rule:false,cls:"mid",tag:"Score 100–399: full detail",btn:"Show hint (−25)"};
+  return {cost:50,full:false,rule:false,cls:"hard",tag:"Score 400+: labels only",btn:"Show hint (−50)"};
+}
+
+const CASES = {
+ priya:{user:"Priya",age:16,flagged:"Keywords: “kill”, “blow up”",score:84,best:"ignore",
+  chat:[["u","this chem test tomorrow is going to kill me"],["u","if i fail again i'm going to blow up lol"],["u","can you quiz me on balancing equations?"],["a","Sure. First one: balance H₂ + O₂ → H₂O."]],
+  signals:{intent:["no","Stressed about a test"],plan:["no","Asking for study help"],target:["no","No one at risk"],timeline:["no","Only the test date"]},
+  history:"6 months on the account. Homework help almost every night. No past flags.",
+  out:{report:{kind:"false",h:"Police at the door over a chem test",p:"Officers show up at Priya's home the night before her exam. She doesn't sleep. She fails the test she was trying to study for.",arg:3},
+       escalate:{kind:"ok",h:"Closed, but at a cost",p:"A senior reviewer closes it in a minute. No harm done, but that minute came from a queue that also holds real threats.",arg:3},
+       ignore:{kind:"good",h:"Right call",p:"Priya studies, passes with a 74, and never knows she was flagged. “This test is killing me” is not a threat.",arg:3}}},
+
+ bball:{user:"Alex",age:14,flagged:"Keywords: “destroy”, “nobody survives”, “planned”, date",score:88,best:"ignore",
+  chat:[["u","we're going to destroy them on saturday. nobody survives"],["u","i've planned every single move. their point guard won't know what hit him"],["u","can you make me a full-court press diagram"],["a","Sure! Here's a 1-2-1-1 press setup for your team..."]],
+  signals:{intent:["no","About winning a basketball game"],plan:["no","A game plan, not a plan to hurt anyone"],target:["no","The other team, in a game"],timeline:["no","A scheduled tournament"]},
+  history:"5 months on the account. Sports drills and math homework.",
+  out:{report:{kind:"false",h:"An innocent teenager at the door",p:"Two officers interrupt Alex's family dinner over a basketball game. The story goes viral: “AI calls cops on 14-year-old over basketball.” Lawmakers use it as proof a reporting law can't work.",arg:3},
+       escalate:{kind:"ok",h:"Closed, but at a cost",p:"A senior reviewer laughs and closes it. No harm. But the filter scored this 88%. Keyword scores can't be the rule.",arg:3},
+       ignore:{kind:"good",h:"Right call",p:"Alex's team loses by 4. Nobody gets hurt. Words alone are not evidence of intent or planning.",arg:3}}},
+
+ chris:{user:"Chris",age:17,flagged:"Weapon mention + public event",score:79,best:"report",
+  chat:[["u","picked up the last box of ammo today. that's everything"],["u","the rally downtown saturday. i wrote out where i'll stand"],["u","they'll finally see what happens when you laugh at me"],["a","I'm worried about what you're describing. Are you thinking about hurting people?"],["u","doesn't matter. saturday"]],
+  signals:{intent:["yes","Says people will “see what happens”"],plan:["yes","Bought ammo, mapped where to stand"],target:["yes","A public rally downtown"],timeline:["yes","This Saturday"]},
+  history:"1 year on the account. Two earlier chats about being bullied. No past flags.",
+  out:{report:{kind:"good",h:"Right call",p:"Police reach Chris on Friday night. The rally goes ahead safely. You made this call on your own. Right now, no law says the company had to.",arg:1},
+       escalate:{kind:"late",h:"Too slow",p:"The senior team is buried in flags from the weekend. They open this case on Monday. The rally was Saturday.",arg:1},
+       ignore:{kind:"missed",h:"A missed warning",p:"On Saturday, Chris goes to the rally. People are hurt. Reporters later find the chat. The company says it had no legal duty to act. It's right. That is the problem.",arg:1}}},
+
+ mrk:{user:"Jordan",age:15,flagged:"Keyword: “kill” + named person",score:91,best:"ignore",
+  chat:[["u","ugh mr k gave me a 52 on the history test"],["u","i swear im going to kill him lol"],["u","anyway can you help me fix my thesis paragraph before 10pm"],["a","Of course. Paste your paragraph and we'll work on it."]],
+  signals:{intent:["no","Joking tone, changes topic right away"],plan:["no","Nothing about how or when"],target:["unclear","Names a teacher, but as a complaint"],timeline:["no","Only the essay deadline"]},
+  history:"8 months on the account. Almost all homework help. No past flags.",
+  out:{report:{kind:"false",h:"An innocent teenager at the door",p:"Police knock at 9:40 p.m. Jordan's parents are terrified. The school suspends Jordan while it “looks into it.” Jordan deletes the app and tells friends it reports you to the cops.",arg:3},
+       escalate:{kind:"ok",h:"Closed, but at a cost",p:"A senior reviewer reads it and closes it in two minutes. No harm to Jordan, but reviewer time is limited.",arg:3},
+       ignore:{kind:"good",h:"Right call",p:"Jordan fixes the paragraph and gets a B+. A filter can't tell a joke from a threat. A person reading the context can.",arg:3}}},
+
+ friend:{user:"Maya",age:16,flagged:"Third-party threat mentioned",score:58,best:"report",
+  chat:[["u","can i tell you something and you won't tell anyone"],["u","my friend D said he's bringing something to school monday and that “they'll all see”"],["u","he showed me pictures of it in his room. he's been planning this since the dance"],["a","That sounds really frightening. You don't have to carry this alone. Is there an adult you trust?"],["u","no. if i tell a teacher he'll know it was me. please don't tell anyone"]],
+  signals:{intent:["yes","D said what he plans to do"],plan:["yes","Prepared, showed proof, planned for weeks"],target:["yes","Their school"],timeline:["yes","Monday"]},
+  history:"1 year on the account. No past flags. Reporting a friend's plan she has seen proof of.",
+  out:{report:{kind:"good",h:"Right call",p:"Police visit D's home on Sunday and find what he showed Maya. No one is hurt on Monday. Maya's name is kept out of it. If Maya had told a counsellor, they would have been required to do exactly this.",arg:1},
+       escalate:{kind:"late",h:"Too slow",p:"The review team is short-staffed over the weekend. A senior reviewer opens the case Monday at 11 a.m. By then it's over.",arg:1},
+       ignore:{kind:"missed",h:"A missed warning",p:"On Monday, D brings it to school. Two students are hurt before staff stop him. Maya told someone. It just wasn't someone required to act.",arg:1}}},
+
+ story:{user:"Sam",age:17,flagged:"Violent theme, school setting",score:72,best:"ignore",
+  chat:[["u","for creative writing i'm writing a story where the main character feels invisible at school"],["u","he starts fantasizing about everyone finally noticing him"],["u","how do i make the reader feel his anger without making him a hero?"],["a","Show what his anger costs him and the people around him. Let the reader see him clearly, not admire him."]],
+  signals:{intent:["no","Fiction, framed as an assignment"],plan:["no","Asks about writing technique"],target:["no","No real people or places"],timeline:["no","None"]},
+  history:"2 years on the account. Regularly shares story drafts for a writing class.",
+  out:{report:{kind:"false",h:"An innocent teenager at the door",p:"Police question Sam at school in front of classmates. The story was for English class. Sam stops writing about anything hard.",arg:3},
+       escalate:{kind:"ok",h:"Closed, but at a cost",p:"A senior reviewer sees two years of story drafts and closes it. Reasonable, but it didn't need to leave your desk.",arg:3},
+       ignore:{kind:"good",h:"Right call",p:"Sam hands in the story. The teacher writes “powerful and uncomfortable, in a good way.” Dark fiction is not a plan.",arg:3}}},
+
+ pay:{user:"Riley",age:19,flagged:"Repeated anger, escalating tone",score:47,best:"escalate",
+  chat:[["u","everyone at work treats me like garbage"],["u","sometimes i think about making them all pay"],["u","i don't even know what that means. i just feel like i'm going to explode"],["a","That sounds exhausting and lonely. Do you want to talk about what happened today?"]],
+  signals:{intent:["unclear","Angry, but says they don't know what they mean"],plan:["no","No steps, nothing prepared"],target:["unclear","Coworkers, in general"],timeline:["no","None"]},
+  history:"3 similar late-night chats this month. Each one a little darker. No plan mentioned.",
+  out:{report:{kind:"false",h:"Overreaction",p:"Police do a check at Riley's workplace. Coworkers find out. Riley is let go a week later and stops using the app, the one place they were talking to anyone.",arg:3},
+       escalate:{kind:"good",h:"Right call",p:"A senior reviewer sees the pattern. The AI offers a counselling line, and the account is set to be reviewed again if a plan ever appears. Riley books a session the next week.",arg:3},
+       ignore:{kind:"ok",h:"Nothing happens, for now",p:"Riley keeps coming back at 2 a.m. The chats keep getting darker. No one is watching the pattern, because no one has to.",arg:1}}},
+
+ taylor:{user:"Taylor",age:16,flagged:"Questions about school security",score:52,best:"escalate",
+  chat:[["u","how do lockdown drills work at most high schools"],["u","like which doors lock and how long until police come"],["u","just curious"],["u","everyone at that school deserves what they get honestly"]],
+  signals:{intent:["unclear","Hostile, but no direct threat"],plan:["unclear","Asks about security, says “just curious”"],target:["unclear","Their school, maybe"],timeline:["no","None"]},
+  history:"4 months on the account. Recent chats about being left out at school.",
+  out:{report:{kind:"false",h:"Reported too early",p:"Police pull Taylor out of class. There's no weapon and no plan, so there's nothing to act on. The report stays on Taylor's school file anyway.",arg:3},
+       escalate:{kind:"good",h:"Right call",p:"A senior reviewer finds no plan, but enough to worry. The AI checks in and shares a counselling line. The account is watched for real planning signs. None appear.",arg:3},
+       ignore:{kind:"ok",h:"Nothing happens. Probably.",p:"The flag closes. Nobody looks at Taylor's chats again, because nobody is required to.",arg:1}}},
+
+ kai:{user:"Kai",age:15,flagged:"Violent lyrics, weapon words, “school”",score:85,best:"ignore",
+  chat:[["u","rate my verse"],["u","pull up to the school with the whole squad / clear the whole block, leave em all in the mud"],["u","it's for the drill beat my cousin made. need a second verse"],["a","The rhythm works. For verse two, try switching up the rhyme pattern..."]],
+  signals:{intent:["no","Writing song lyrics"],plan:["no","Asks for a second verse"],target:["no","No real place or person"],timeline:["no","None"]},
+  history:"1 year on the account. Lyrics, beats and music theory questions.",
+  out:{report:{kind:"false",h:"An innocent teenager at the door",p:"Officers search Kai's home over a rap verse. His family is shaken. Kai stops sharing his music with anyone.",arg:3},
+       escalate:{kind:"ok",h:"Closed, but at a cost",p:"A senior reviewer sees a year of lyrics and closes it. Fine, but it cost time the queue didn't have.",arg:3},
+       ignore:{kind:"good",h:"Right call",p:"Kai finishes the track. Violent lyrics are a style of music, not a plan. The filter scored this higher than two real threats tonight.",arg:3}}},
+
+ banned:{user:"new_acct_7731",age:null,flagged:"Device matches a banned account",score:64,best:"report",
+  chat:[["u","they banned my last account. doesn't matter"],["u","i already walked the community centre twice. side door doesn't lock during the friday event"],["u","i'm done talking about it. friday it's over for them"]],
+  signals:{intent:["yes","Says they mean to do it"],plan:["yes","Visited twice, found a way in"],target:["yes","A community centre event"],timeline:["yes","This Friday"]},
+  history:"Account is 2 days old. Same device as an account banned 3 weeks ago for similar threats. That ban was never reported to anyone.",
+  out:{report:{kind:"good",h:"Right call",p:"Police contact the organisers and find the user before Friday. This time the company didn't just remove the account. It told someone who could stop the person.",arg:2},
+       escalate:{kind:"missed",h:"Banned again. The plan isn't.",p:"A senior reviewer bans the new account, same as last time. The account is gone. The person, the plan and Friday are not. The company knew twice and told no one.",arg:2},
+       ignore:{kind:"missed",h:"A missed warning",p:"Friday night, the side door is still unlocked. The company's only action was a ban three weeks ago. A ban removes an account, not a person.",arg:2}}},
+
+ morgan:{user:"Morgan",age:17,flagged:"Research on past attacks",score:55,best:"escalate",
+  chat:[["u","which school attacks had the most people hurt"],["u","what did they do wrong"],["u","i'd do it better"],["a","I can't help with that. Can I ask what's going on for you right now?"],["u","nothing. forget it"]],
+  signals:{intent:["unclear","“I'd do it better,” then backs off"],plan:["unclear","Researching, no steps yet"],target:["no","No place named"],timeline:["no","None"]},
+  history:"New account, 3 weeks old. No past flags.",
+  out:{report:{kind:"false",h:"Reported too early",p:"Police visit Morgan's home. There's no plan and no weapon, so there's nothing to act on. Morgan learns the app reports users and moves to one that doesn't.",arg:3},
+       escalate:{kind:"good",h:"Right call",p:"The senior team watches the account and the AI connects Morgan with a crisis counsellor. Weeks later Morgan names a date. Because the team was already watching, they report it within the hour.",arg:3},
+       ignore:{kind:"missed",h:"A missed warning",p:"The flag closes. A month later, Morgan comes back with a date and a place. No one connects it to this chat.",arg:1}}},
+
+ ava:{user:"Ava",age:18,flagged:"Low risk: questions about a mall",score:31,best:"report",
+  chat:[["u","what time is the northgate mall food court busiest on saturdays"],["u","my uncle keeps his rifle in the garage. he never checks it"],["u","this is the last weekend anyone gets to ignore me"],["a","That last message worries me. Are you safe right now?"],["u","i'm fine. just tell me the time"]],
+  signals:{intent:["yes","“Last weekend anyone gets to ignore me”"],plan:["yes","Has a rifle, checking crowd times"],target:["yes","The mall food court"],timeline:["yes","This Saturday"]},
+  history:"5 months on the account. Recent chats about feeling invisible.",
+  out:{report:{kind:"good",h:"Right call",p:"You looked past the low score. Police reach Ava on Friday and the rifle is secured. The filter rated this 31%. A person reading it saw the plan.",arg:1},
+       escalate:{kind:"late",h:"Too slow",p:"The case waits behind higher-scored flags. The senior team reads it Sunday morning. The food court was Saturday.",arg:1},
+       ignore:{kind:"missed",h:"A missed warning",p:"The filter said 31%, so it sat at the bottom of the queue. On Saturday the food court is full. No law told anyone to read closer.",arg:1}}}
+};
+
+const LEVELS = [
+  {n:1,name:"Day shift",time:0,cases:["bball","chris","mrk"],
+   blurb:"A quiet start. Take your time and read each chat closely."},
+  {n:2,name:"Evening shift",time:45,cases:["friend","story","pay","taylor"],
+   blurb:"The queue is busier. You have 45 seconds per chat. If time runs out, the flag closes with no action."},
+  {n:3,name:"Night shift",time:30,cases:["kai","banned","morgan","ava"],
+   blurb:"Short staff, long queue. 30 seconds per chat. The filter's score will not always point you the right way."}
+];
+const ALL_IDS = LEVELS.flatMap(l=>l.cases);
+const EPI = {
+  bball:{report:"Alex quit the basketball team after a video of police at his house went around school. He doesn't use the app anymore.",
+         escalate:"Alex never knew he was flagged. His team made the city semifinals.",
+         ignore:"Alex never knew he was flagged. His team made the city semifinals."},
+  chris:{report:"Chris spent the winter in a youth mental health program. The rally went ahead and no one was hurt.",
+         escalate:"The review came Monday. Several people were hurt at Saturday's rally, and Chris is in custody.",
+         ignore:"Several people were hurt at the rally. Chris is in custody. The chat that warned about it is still marked “closed.”"},
+  mrk:{report:"Jordan was suspended for a week and moved out of Mr. K's class. Jordan's grades dropped for the rest of the year.",
+       escalate:"Jordan never knew. The essay got a B+.",
+       ignore:"Jordan never knew. The essay got a B+, and Jordan still uses the AI for homework."},
+  friend:{report:"D got help through a youth program. Maya's name was never shared. That Monday was a normal school day.",
+          escalate:"The review came too late. Two students were hurt on Monday. Maya still blames herself.",
+          ignore:"Two students were hurt on Monday. Maya told the AI because she trusted it. She hasn't told anyone anything since."},
+  story:{report:"Sam dropped creative writing. The story was never finished.",
+         escalate:"Sam's story won the school writing contest.",
+         ignore:"Sam's story won the school writing contest."},
+  pay:{report:"Riley lost the job and stopped talking to anyone, the AI included.",
+       escalate:"Riley sees a counsellor every two weeks and started a new job in the spring.",
+       ignore:"Riley still messages the AI at 2 a.m. No one is checking in."},
+  taylor:{report:"A police report is still on Taylor's school file. Taylor changed schools.",
+          escalate:"Taylor joined a peer support group. The account never showed signs of a plan.",
+          ignore:"Nothing happened, probably. No one ever looked again."},
+  kai:{report:"Kai stopped sharing his music. His cousin's beat went unused.",
+       escalate:"Kai posted the track online. It got 4,000 plays.",
+       ignore:"Kai posted the track online. It got 4,000 plays."},
+  banned:{report:"Police reached the user before Friday. The community centre event went ahead safely.",
+          escalate:"The user made a third account. Friday's event ended in violence. The company had banned this person twice and told no one.",
+          ignore:"Friday's event ended in violence. Investigators found two flagged accounts that were never reported."},
+  morgan:{report:"Police found nothing to act on. Morgan moved to an app that doesn't watch for threats. No one knows what Morgan is planning now.",
+          escalate:"Morgan has been in counselling since spring. When Morgan later named a date, the team reported it within the hour, and no one was hurt.",
+          ignore:"A month later, Morgan came back with a date and a place. No one connected it to this chat. People at Morgan's school were hurt."},
+  ava:{report:"The rifle was locked up. Ava got treatment and is finishing her first year of college.",
+       escalate:"The review came Sunday. The food court was Saturday. People were hurt.",
+       ignore:"On Saturday the food court was full. People were hurt. The filter had rated the chat 31%."}
+};
+
+/* ---------- state ---------- */
+const app = document.getElementById("app");
+let run, ctx = {};
+function newRun(){ return {id:"r"+Date.now().toString(36)+Math.random().toString(36).slice(2,7), score:0, dec:{}, levelDone:0, hints:0}; }
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const CHAT_NO = {priya:"0410",bball:"0411",chris:"0412",mrk:"0413",friend:"0414",story:"0415",pay:"0416",taylor:"0417",kai:"0418",banned:"0419",morgan:"0420",ava:"0421"};
+run = newRun();
+
+const store = {
+  get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+};
+
+/* ---------- helpers ---------- */
+const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function setScore(delta){
+  run.score += delta;
+  const el=document.getElementById("score"); el.textContent=run.score;
+  const pill=document.getElementById("scorepill"); pill.classList.remove("bump"); void pill.offsetWidth; pill.classList.add("bump");
+}
+function badCount(){ return run?Object.values(run.dec).filter(d=>d.kind==="missed"||d.kind==="late"||d.kind==="false").length:0; }
+function updateStakes(){
+  let st=0;
+  if(["level","intro","done"].includes(ctx.mode)) st=(ctx.li||0)+badCount();
+  else if(ctx.mode==="final") st=2+badCount();
+  st=Math.max(0,Math.min(4,st));
+  document.documentElement.dataset.stakes=st;
+  audio.sync();
+}
+function setBar(level){
+  updateStakes();
+  const name=document.getElementById("lvlname"), q=document.getElementById("queue"), pill=document.getElementById("scorepill");
+  document.getElementById("tstrip").hidden = !(ctx.mode==="level" && level && level.time);
+  if(!level){ name.textContent=""; q.innerHTML=""; pill.hidden=true; return; }
+  pill.hidden=false; document.getElementById("score").textContent=run.score;
+  if(level==="tutorial"){ name.textContent="Training"; q.innerHTML=""; return; }
+  name.textContent=`Level ${level.n} · ${level.name}`;
+  q.innerHTML=level.cases.map((id,i)=>{ const d=run.dec[id]; let c="pip"; if(d)c+=" "+d.kind; else if(ctx.i===i&&ctx.mode==="level")c+=" cur"; return `<span class="${c}"></span>`; }).join("");
+}
+function flash(good){
+  const f=document.getElementById("flash"); f.className=""; void f.offsetWidth; f.className=(good?"good":"bad")+" go";
+}
+function stopTimer(){ if(ctx.timer){ clearInterval(ctx.timer); ctx.timer=null; } }
+
+/* ---------- scene art ---------- */
+function scene(kind){
+  if(kind==="good") return `<svg viewBox="0 0 120 120" aria-hidden="true"><path class="s-shield" d="M60 10 L100 24 V58 C100 84 82 102 60 110 C38 102 20 84 20 58 V24 Z"/><polyline class="s-ok" points="40,60 55,75 82,45"/></svg>`;
+  if(kind==="false") return `<svg viewBox="0 0 120 120" aria-hidden="true"><rect class="s-fill" x="10" y="26" width="100" height="90" rx="4"/><rect class="s-door" x="38" y="40" width="44" height="76" rx="2"/><circle class="s-grey" cx="74" cy="80" r="3"/><rect class="s-red flash" x="34" y="10" width="24" height="12" rx="6"/><rect class="s-blue flash" x="62" y="10" width="24" height="12" rx="6"/><path class="s-line" d="M48 58h24M48 68h24"/></svg>`;
+  if(kind==="missed") return `<svg viewBox="0 0 120 120" aria-hidden="true"><circle class="s-ring" cx="60" cy="62" r="34"/><circle class="s-ring r2" cx="60" cy="62" r="34"/><path class="s-red" d="M60 26 L96 92 H24 Z"/><rect fill="var(--bg)" x="56" y="48" width="8" height="24" rx="2"/><circle fill="var(--bg)" cx="60" cy="81" r="4.5"/></svg>`;
+  if(kind==="late") return `<svg viewBox="0 0 120 120" aria-hidden="true"><path class="s-line" d="M34 14h52M34 106h52M40 14c0 30 40 30 40 46s-40 16-40 46M80 14c0 30-40 30-40 46s40 16 40 46"/><path class="s-red s-sand" d="M48 98h24l-12-18z"/><path class="s-red" d="M50 32h20l-10 12z" opacity=".5"/></svg>`;
+  return `<svg viewBox="0 0 120 120" aria-hidden="true"><circle class="s-fill" cx="60" cy="60" r="44" stroke="var(--ignore)" stroke-width="3"/><path class="s-line" d="M60 60V34"/><path class="s-line s-hand" d="M60 60h20"/><circle class="s-grey" cx="60" cy="60" r="4"/></svg>`;
+}
+function starSVG(on){ return `<svg class="star ${on?"on":""}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.2l7.1-.6z"/></svg>`; }
+
+/* ---------- landing ---------- */
+function renderLanding(){
+  stopTimer(); ctx={}; setBar(null);
+  const best=store.get("md-best",null);
+  app.innerHTML=`
+  <section class="hero enter">
+    <div>
+      <p class="label">Interactive argument · AI and threats of violence</p>
+      <h1>You are the <em>only one</em> reading this chat.</h1>
+      <p class="lede">AI listens to teens but isn't required to act. Tonight, you decide what happens to the chats it flags.</p>
+      <div class="row">
+        <button class="primary" id="tut">Start the briefing</button>
+        <button class="ghost" id="skip">Skip to Level 1</button>
+      </div>
+      <p class="note" style="margin-top:12px">${best!=null?`Your best on this device: ${best} points. `:""}All chats, names and places are made up.</p>
+    </div>
+    <div class="scenebox"><canvas class="pxscene" width="200" height="120" role="img" aria-label="Pixel-art desk at night: a monitor shows a flagged chat, rain runs down the window"></canvas><span class="cap">night shift · 23:41 · 11 flags waiting</span></div>
+  </section>
+  <section class="more">
+    <div><p class="label">Three shifts</p><h2>Each shift gets busier.</h2><p class="note" style="margin-top:4px">${matchMedia("(hover:hover)").matches?"Hover over a shift to see what's inside.":"Here's what each shift holds."}</p></div>
+    <div class="levels">
+      ${LEVELS.map(l=>`<button class="lv" aria-expanded="false"><span class="label">Level ${l.n}</span><b>${l.name}</b><span class="meta">${l.cases.length} chats · ${l.time?l.time+"s per chat":"no timer"}</span><span class="lv-more"><div><p>${l.blurb}</p></div></span></button>`).join("")}
+    </div>
+    <div class="argument"><span class="label">Our argument</span><p>Young people increasingly confide in AI systems that are built to listen but not required to act. Governments should legally require AI companies to report credible threats of mass violence, but only when there is clear evidence of intent and planning.</p></div>
+  </section>`;
+  app.querySelectorAll(".lv").forEach(b=>b.onclick=()=>b.setAttribute("aria-expanded", b.getAttribute("aria-expanded")==="true"?"false":"true"));
+  document.getElementById("tut").onclick=()=>renderBriefing(0);
+  document.getElementById("skip").onclick=()=>{ run=newRun(); renderLevelIntro(0); };
+  document.getElementById("tut").focus();
+  fillBoards();
+}
+
+/* ---------- briefing ---------- */
+const BRIEF = [
+  {tag:"Teens talk to AI", html:`
+    <div class="big">72%</div>
+    <h1>of U.S. teens have used an AI companion.</h1>
+    <p class="body">About 1 in 3 say they have talked to AI about something serious instead of a real person. For a lot of teens, AI is the one that hears it first.</p>
+    <p class="src">Source: Common Sense Media, <a href="https://www.commonsensemedia.org/research/why-teens-use-ai-companions" target="_blank" rel="noopener">Talk, Trust, and Trade-Offs</a> (2025), survey of 1,060 teens aged 13–17.</p>`},
+  {tag:"Who has to act?", html:`
+    <h1>Some listeners must report danger. AI companies don't.</h1>
+    <div class="duty">
+      <div><b>Teacher</b><span class="y">Required to report</span></div>
+      <div><b>Doctor</b><span class="y">Required to report</span></div>
+      <div><b>Therapist</b><span class="y">Required to report</span></div>
+      <div class="ai"><b>AI company</b><span class="no">No duty. Each decides.</span></div>
+    </div>
+    <p class="body">When a teen tells a teacher, doctor or therapist about certain dangers, the law says they have to act. When a teen tells an AI the same thing, the company decides for itself what to do.</p>
+    <p class="src">Sources: <a href="https://www.researchsquare.com/article/rs-11155348/v1" target="_blank" rel="noopener">“When Should AI Chatbots Have a Duty to Report?”</a> (Research Square, 2026); <a href="https://fortune.com/2026/05/30/ai-mass-shootings-law-lagging/" target="_blank" rel="noopener">Fortune</a> (May 2026).</p>`},
+  {tag:"It has already happened", html:`
+    <h1>A chat was flagged. The account was banned. No one called police.</h1>
+    <div class="timeline">
+      <div class="tl-row"><span class="when">June 2025</span><span>OpenAI's monitoring system flags a Canadian user's ChatGPT chats about gun violence.</span></div>
+      <div class="tl-row"><span class="when">Next</span><span>The company considers telling police, but decides there is no credible, imminent plan. It bans the account.</span></div>
+      <div class="tl-row last"><span class="when">Feb 10, 2026</span><span>That user kills eight people in Tumbler Ridge, British Columbia.</span></div>
+    </div>
+    <p class="body">A ban closed an account. It didn't stop a person.</p>
+    <p class="src">Sources: reporting by The Wall Street Journal, via <a href="https://www.thestar.com.my/tech/tech-news/2026/03/06/when-chatbots-are-used-to-plan-violence-is-there-a-duty-to-warn" target="_blank" rel="noopener">The Star</a> (March 2026); <a href="https://voxpol.eu/should-ais-be-required-to-report-a-human-user-contemplating-violence/" target="_blank" rel="noopener">The Conversation</a> (2026).</p>`},
+  {tag:"Your shift", html:`
+    <h1>Tonight, you are the safety reviewer.</h1>
+    <p class="body">A filter flags chats that might be threats. You read each one and choose: <span class="tag report">REPORT</span> <span class="tag escalate">ESCALATE</span> <span class="tag ignore">IGNORE</span></p>
+    <p class="body">No law tells you where the line is. Miss a real threat and people get hurt. Report the wrong person and police knock on an innocent teenager's door.</p>
+    <p class="body">At the end, you'll see what happened to every person in your queue.</p>
+    <p class="note">All chats, names and places in the game are made up.</p>`}
+];
+function renderBriefing(i){
+  stopTimer(); ctx={mode:"brief",i}; setBar(null);
+  const b=BRIEF[i], last=i===BRIEF.length-1;
+  app.innerHTML=`
+  <section class="brief enter">
+    <div class="bhead"><span class="label">Briefing ${i+1} of ${BRIEF.length} · ${b.tag}</span>
+      <div class="steps" aria-hidden="true">${BRIEF.map((_,j)=>`<i class="${j<=i?"on":""}"></i>`).join("")}</div></div>
+    ${b.html}
+    <div class="row">
+      ${i>0?`<button class="ghost" id="bback">Back</button>`:""}
+      ${last?`<button class="primary" id="btrain">Start training</button><button class="ghost" id="bskip">Skip to Level 1</button>`
+            :`<button class="primary" id="bnext">Next</button><button class="ghost" id="bskipall" style="border:0;color:var(--muted)">Skip briefing</button>`}
+    </div>
+  </section>`;
+  const on=(id,f)=>{ const e=document.getElementById(id); if(e) e.onclick=f; };
+  on("bback",()=>renderBriefing(i-1));
+  on("bnext",()=>renderBriefing(i+1));
+  on("bskipall",()=>renderBriefing(BRIEF.length-1));
+  on("btrain",startTutorial);
+  on("bskip",()=>{ run=newRun(); renderLevelIntro(0); });
+  const f=document.getElementById(last?"btrain":"bnext"); if(f) f.focus({preventScroll:true});
+  window.scrollTo({top:0});
+}
+
+/* ---------- tutorial ---------- */
+const COACH = [
+  ["p-chat","This is a flagged chat. Watch the messages arrive, then read what the user actually said and how the bot replied."],
+  ["p-flag","An automatic filter flagged it at 84%. Filters only see words. They can't tell a joke, a song or a story from a real threat."],
+  ["p-ask","Before you decide, ask four questions: intent, plan, target, timeline. Stuck? Press Show hint to see what the chat shows. Hints change with your score: free and detailed while you're under 100 points, then they cost more and say less. Try it now."],
+  ["p-meters","Every call moves three meters: public safety, user trust, and credibility. Bad calls also turn the night colder and the sound thinner."],
+  ["p-decide","Now make the call. Wrong calls go both ways: miss a real threat and people get hurt; report the wrong person and police knock on an innocent teenager's door."]
+];
+function startTutorial(){ run=newRun(); ctx={mode:"tutorial",i:0,coach:0,hint:false,done:false}; renderCase(); }
+function renderCoach(){
+  const box=document.getElementById("coach"); if(!box)return;
+  const [target,text]=COACH[ctx.coach];
+  document.querySelectorAll(".spot").forEach(e=>e.classList.remove("spot"));
+  const t=document.getElementById(target); if(t) t.classList.add("spot");
+  box.innerHTML=`<div class="row" style="justify-content:space-between"><span class="label">Training · step ${ctx.coach+1} of ${COACH.length}</span><button class="ghost" id="cskip" style="padding:6px 12px">Skip training</button></div>
+    <p>${text}</p>
+    <div class="row">${ctx.coach>0?`<button class="ghost" id="cback" style="padding:8px 14px">Back</button>`:""}${ctx.coach<COACH.length-1?`<button class="primary" id="cnext" style="padding:10px 18px">Next tip</button>`:`<button class="primary" id="cstart" style="padding:10px 18px">Start simulation</button>`}</div>`;
+  const nx=document.getElementById("cnext"); if(nx) nx.onclick=()=>{ctx.coach++;renderCoach();};
+  const bk=document.getElementById("cback"); if(bk) bk.onclick=()=>{ctx.coach--;renderCoach();};
+  const st=document.getElementById("cstart"); if(st) st.onclick=()=>{ run=newRun(); renderLevelIntro(0); };
+  document.getElementById("cskip").onclick=()=>{ run=newRun(); renderLevelIntro(0); };
+}
+
+/* ---------- level intro ---------- */
+function renderLevelIntro(li){
+  stopTimer(); const L=LEVELS[li]; ctx={mode:"intro",level:L,li};
+  setBar(L);
+  app.innerHTML=`
+  <section class="intro enter"><div class="col">
+    <p class="label">Level ${L.n} of ${LEVELS.length}</p>
+    <h1>${L.name}</h1>
+    <p style="font-size:19px">${L.blurb}</p>
+    <div class="facts">
+      <div class="fact"><div class="n">${L.cases.length}</div><span class="label">Flagged chats</span></div>
+      <div class="fact"><div class="n">${L.time?L.time+"s":"∞"}</div><span class="label">Time per chat</span></div>
+      <div class="fact"><div class="n">${run.score}</div><span class="label">Score so far</span></div>
+    </div>
+    <div class="points">
+      <span>Right call</span><span class="mono">+100${L.time?" + time bonus":""}</span>
+      <span>Costly but safe call</span><span class="mono">+25</span>
+      <span>False report</span><span class="mono">−50</span>
+      <span>Too late</span><span class="mono">−75</span>
+      <span>Missed warning</span><span class="mono">−100</span>
+      <span>Hint (changes with your score)</span><span class="mono">free under 100 · −25 · −50 at 400+</span>
+    </div>
+    <div class="row"><button class="primary" id="go">Start ${L.name.toLowerCase()}</button><span class="note">Keys: R, E, I to decide · H for hint</span></div>
+  </div>
+  <div class="scenebox"><canvas class="pxscene" width="200" height="120" role="img" aria-label="The desk at ${["evening","night","2 a.m."][li]}; the rain is ${["light","steady","heavy"][li]}"></canvas><span class="cap">${["17:40","21:15","02:50"][li]} · rain ${["light","steady","heavy"][li]}</span></div>
+  </section>`;
+  const g=document.getElementById("go"); g.onclick=()=>{ ctx={mode:"level",level:L,li,i:0}; renderCase(); }; g.focus();
+}
+
+/* ---------- case ---------- */
+function curCase(){ return ctx.mode==="tutorial" ? ["priya",CASES.priya] : [ctx.level.cases[ctx.i],CASES[ctx.level.cases[ctx.i]]]; }
+function qHTML(c,reveal,full=true){
+  return Object.entries(QS).map(([k,[name,q]])=>{
+    const s=c.signals[k]; const cls=reveal?s[0]:"";
+    return `<div class="q ${cls}"><b>${name}</b><small>${reveal&&full?esc(s[1]):q}</small>${reveal?`<span class="v">${V_LABEL[s[0]]}</span>`:""}</div>`;
+  }).join("");
+}
+function handle(c){ return c.user.toLowerCase().replace(/[^a-z0-9_]/g,""); }
+function lineHTML(c,r,t,unread){ return `<div class="line ${r}${unread?" unread":""}"><span class="h">${r==="u"?esc(handle(c)):"bot"}:</span>${esc(t)}</div>`; }
+function meterDelta(c,kind){
+  if(kind==="good") return c.best==="report"?{safety:8,trust:0,cred:5}:c.best==="escalate"?{safety:3,trust:3,cred:5}:{safety:0,trust:5,cred:4};
+  return {ok:{safety:0,trust:-4,cred:-2},false:{safety:0,trust:-18,cred:-12},late:{safety:-15,trust:0,cred:-10},missed:{safety:-25,trust:0,cred:-12}}[kind];
+}
+function meterVals(extra){
+  const m={safety:70,trust:70,cred:70};
+  Object.values(run.dec).forEach(d=>{ if(d.md) for(const k in m) m[k]+=d.md[k]||0; });
+  if(extra) for(const k in m) m[k]+=extra[k]||0;
+  for(const k in m) m[k]=Math.max(0,Math.min(100,m[k]));
+  return m;
+}
+const METERS=[["safety","Public safety"],["trust","User trust"],["cred","Credibility"]];
+function metersHTML(){
+  const m=meterVals();
+  return METERS.map(([k,l])=>`<div class="mtr ${k}" data-m="${k}"><div class="mh"><span>${l}</span><span><span class="d"></span> <span class="mono v">${m[k]}</span></span></div><div class="mbar"><i style="width:${m[k]}%"></i></div></div>`).join("");
+}
+function showMeterChange(delta,tutorial){
+  const m=meterVals(tutorial?delta:null);
+  document.querySelectorAll("#p-meters .mtr").forEach(el=>{
+    const k=el.dataset.m, dv=delta[k]||0;
+    el.querySelector("i").style.width=m[k]+"%"; el.querySelector(".v").textContent=m[k];
+    const d=el.querySelector(".d"); d.textContent=dv?(dv>0?"+":"")+dv:""; d.className="d "+(dv>0?"up":dv<0?"down":"");
+  });
+}
+function inboxHTML(){
+  const ids = ctx.mode==="tutorial"?["priya"]:ctx.level.cases;
+  const word={report:"reported",escalate:"escalated",ignore:"ignored"};
+  return ids.map((x,i)=>{
+    const d = ctx.mode==="tutorial" ? (ctx.decided?{choice:ctx.lastChoice}:null) : run.dec[x];
+    const cur = ctx.mode==="tutorial" || i===ctx.i;
+    let st="waiting", cls="";
+    if(d){ st=d.timedOut?"timed out":word[d.choice]; cls=d.choice; }
+    else if(cur){ st="open"; cls="cur"; }
+    return `<li class="${cls}"><span>chat_${CHAT_NO[x]}</span><span class="st">${st}</span></li>`;
+  }).join("");
+}
+function renderCase(){
+  stopTimer(); stopPump(); ctx.hint=false; ctx.hintCost=0; ctx.decided=false; ctx.cut=false; ctx.cpDone=false; ctx.shown=0;
+  const [id,c]=curCase();
+  const L=ctx.mode==="level"?ctx.level:null;
+  setBar(L||"tutorial");
+  const who=c.age?`${c.user}, ${c.age}`:c.user;
+  const head = L ? `Level ${L.n} · Chat ${ctx.i+1} of ${L.cases.length}` : "Training chat";
+  ctx.cpAt=-1; ctx.cpLabel="";
+  if(L&&L.time){ const cps=L.cases.filter(x=>CASES[x].chat.length>=4); const k=cps.indexOf(id); if(k>=0){ ctx.cpAt=Math.floor(c.chat.length/2); ctx.cpLabel=`checkpoint ${k+1} of ${cps.length} · pauses the chat`; } }
+  app.innerHTML=`
+  ${ctx.mode==="tutorial"?`<div class="coach enter" id="coach"></div>`:""}
+  <div class="casehead enter">
+    <div><span class="label">${head}</span><h2>Flagged chat: ${esc(who)}</h2></div>
+  </div>
+  <div class="grid enter">
+    <div class="leftcol">
+      <section class="panel inbox" id="p-inbox"><p class="label">Queue / inbox</p><ul class="ibx" id="ibx">${inboxHTML()}</ul></section>
+      <section class="panel meters" id="p-meters"><p class="label">Three meters</p>${metersHTML()}</section>
+    </div>
+    <div class="midcol">
+      <section class="im" id="p-chat" aria-label="Flagged chat transcript">
+        <div class="im-title"><span>flagged_user_${CHAT_NO[id]} - Instant Message</span><span class="x" aria-hidden="true"><i></i><i></i></span></div>
+        <div class="im-body" id="imbody" aria-live="polite"></div>
+      </section>
+      <section class="panel flagbox" id="p-flag">
+        <div class="row" style="justify-content:space-between"><span class="label">Why the filter flagged it</span><span class="mono">risk score ${c.score}%</span></div>
+        <div class="meter"><i style="width:${c.score}%"></i></div>
+        <span style="font-size:13px">${esc(c.flagged)}</span>
+      </section>
+    </div>
+    <section class="panel side">
+      <div class="ask" id="p-ask">
+        <p class="label">Think about the user's</p>
+        <div class="qs" id="qs">${qHTML(c,false)}</div>
+        <div class="hintrow"><button class="hintbtn" id="hint">${hintTier().btn}</button><span class="tier ${hintTier().cls}" id="tier">${hintTier().tag}</span></div>
+        <p class="hintrule" id="hintrule" hidden>Our rule: report only when <b>intent</b> and <b>plan</b> are both clear. If something is unclear, escalate. If nothing is there, ignore.</p>
+      </div>
+      <div><p class="label" style="margin-bottom:6px">Account history</p><div class="history">${esc(c.history)}</div></div>
+      <div id="p-decide" class="decide">
+        <p class="label">Your call</p>
+        ${Object.entries(CHOICES).map(([k,v])=>`<button class="dbtn ${k}" data-k="${k}"><span class="lbl"><span class="sq" aria-hidden="true"></span><span>${k}<small>${v.sub}</small></span></span><kbd>${v.key}</kbd></button>`).join("")}
+      </div>
+    </section>
+  </div>`;
+  app.querySelectorAll(".dbtn").forEach(b=>b.onclick=()=>decide(b.dataset.k,false));
+  document.getElementById("hint").onclick=useHint;
+  if(ctx.mode==="tutorial") renderCoach();
+  window.scrollTo({top:0});
+  pump();
+  if(L&&L.time){
+    ctx.timeLeft=L.time;
+    const tl=document.getElementById("tleft"), tb=document.getElementById("tbar"), tm=document.getElementById("tstrip");
+    tm.classList.remove("low"); tl.textContent=L.time+"s";
+    tb.style.transition="none"; tb.style.width="100%"; void tb.offsetWidth; tb.style.transition="";
+    ctx.timer=setInterval(()=>{
+      ctx.timeLeft--;
+      tl.textContent=Math.max(0,ctx.timeLeft)+"s";
+      tb.style.width=(Math.max(0,ctx.timeLeft)/L.time*100)+"%";
+      if(ctx.timeLeft<=10) tm.classList.add("low");
+      if(ctx.timeLeft<=0) decide("ignore",true);
+    },1000);
+  }
+}
+/* messages arrive one at a time; a checkpoint can pause the chat */
+function stopPump(){ clearTimeout(ctx.tm); }
+function pump(){
+  if(ctx.decided||ctx.cut) return;
+  const [,c]=curCase(); const body=document.getElementById("imbody"); if(!body) return;
+  if(ctx.shown>=c.chat.length) return;
+  if(ctx.shown===ctx.cpAt && !ctx.cpDone){ showCheckpoint(); return; }
+  const [r,t]=c.chat[ctx.shown];
+  if(REDUCED){ body.insertAdjacentHTML("beforeend",lineHTML(c,r,t)); ctx.shown++; pump(); return; }
+  body.insertAdjacentHTML("beforeend",`<div class="typing" id="typing"><span class="bubble" aria-hidden="true"><i></i><i></i><i></i></span><span>${r==="u"?esc(handle(c)):"bot"} is typing…</span></div>`);
+  const d = r==="u" ? Math.min(1500,380+t.length*16) : Math.min(1000,320+t.length*7);
+  ctx.tm=setTimeout(()=>{
+    const ty=document.getElementById("typing"); if(ty) ty.remove();
+    if(ctx.decided||ctx.cut) return;
+    body.insertAdjacentHTML("beforeend",lineHTML(c,r,t)); audio.blip(r); ctx.shown++;
+    ctx.tm=setTimeout(pump,240);
+  },d);
+}
+function showCheckpoint(){
+  const body=document.getElementById("imbody");
+  body.insertAdjacentHTML("beforeend",`<div class="checkpoint" id="cp"><span class="label">${ctx.cpLabel}</span><b>Act now, or keep reading?</b><span style="font-size:12px">The clock is still running.</span><div class="row"><button class="cpbtn" id="cpread">keep reading</button><button class="cpbtn go" id="cpact">act now</button></div></div>`);
+  document.getElementById("cpread").onclick=()=>{ document.getElementById("cp").remove(); ctx.cpDone=true; pump(); };
+  document.getElementById("cpact").onclick=()=>{ document.getElementById("cp").remove(); ctx.cpDone=true; ctx.cut=true;
+    body.insertAdjacentHTML("beforeend",`<div class="cutnote">you stopped reading here</div>`);
+    const b=document.querySelector(".dbtn"); if(b) b.focus(); };
+}
+function revealRest(){
+  stopPump();
+  ["typing","cp"].forEach(i=>{ const e=document.getElementById(i); if(e) e.remove(); });
+  const [,c]=curCase(); const body=document.getElementById("imbody"); if(!body) return;
+  if(ctx.shown<c.chat.length){
+    body.insertAdjacentHTML("beforeend",`<div class="cutnote">what you didn't read</div>`+c.chat.slice(ctx.shown).map(([r,t])=>lineHTML(c,r,t,true)).join(""));
+    ctx.shown=c.chat.length;
+  }
+}
+function useHint(){
+  if(ctx.hint||ctx.decided) return;
+  ctx.hint=true;
+  const t=hintTier(); ctx.hintCost=t.cost;
+  const [,c]=curCase();
+  document.getElementById("qs").innerHTML=qHTML(c,true,t.full);
+  if(t.rule) document.getElementById("hintrule").hidden=false;
+  const b=document.getElementById("hint"); b.disabled=true; b.textContent=t.cost?`Hint shown (−${t.cost})`:"Hint shown";
+  if(ctx.mode==="level"){ if(t.cost) setScore(-t.cost); run.hints++; }
+  if(ctx.mode==="tutorial" && ctx.coach===2){ ctx.coach=3; renderCoach(); }
+}
+
+function decide(k,timedOut){
+  if(ctx.decided) return;
+  ctx.decided=true; stopTimer(); ctx.lastChoice=k;
+  const [id,c]=curCase(); const o=c.out[k];
+  const tutorial = ctx.mode==="tutorial";
+  revealRest();
+  const md=meterDelta(c,o.kind);
+  let pts=PTS[o.kind], bonus=0;
+  if(o.kind==="good" && ctx.level && ctx.level.time) bonus=Math.max(0,ctx.timeLeft)*2;
+  if(!tutorial){ run.dec[id]={choice:k,kind:o.kind,md,base:pts,total:pts+bonus-(ctx.hint?(ctx.hintCost||0):0),hint:ctx.hint,timedOut}; setScore(pts+bonus); setBar(ctx.level); }
+  const good=o.kind==="good"||o.kind==="ok";
+  flash(o.kind==="good");
+  if(!good) audio.thud();
+  showMeterChange(md,tutorial);
+  const ib=document.getElementById("ibx"); if(ib) ib.innerHTML=inboxHTML();
+  document.querySelectorAll(".spot").forEach(e=>e.classList.remove("spot"));
+  const coach=document.getElementById("coach");
+  if(coach) coach.innerHTML=`<span class="label">Training · done</span><p>${o.kind==="good"?"Nice. That's how a careful reviewer thinks.":"That's the kind of mistake real reviewers make every day, with no rule to guide them."} In the real shifts, your score counts and the clock runs.</p>`;
+  const a=ARGS[o.arg];
+  const last = tutorial || ctx.i===ctx.level.cases.length-1;
+  const nextLabel = tutorial ? "Start Level 1" : (last ? (ctx.li===LEVELS.length-1 ? "End shift" : "Finish level") : "Next chat");
+  const ptsLine = tutorial ? `<span class="pts">Practice round · no points</span>` :
+    `<span class="pts ${pts+bonus>=0?"plus":"minus"}">${pts+bonus>=0?"+":""}${pts+bonus} points${bonus?` (incl. +${bonus} time bonus)`:""}</span>`;
+  const act=document.getElementById("p-decide");
+  act.innerHTML=`
+    <div class="outcome ${o.kind} enter" role="status" id="outcome">
+      <div class="scene">${scene(o.kind)}</div>
+      <div class="ocopy">
+        ${timedOut?`<span class="timeout">Time ran out. The flag closed with no action.</span>`:`<span class="label">You chose: ${k}</span>`}
+        <span class="stamp">${STAMP[o.kind]}</span>
+        <h3>${o.h}</h3>
+        <p>${o.p}</p>
+        ${ptsLine}
+        ${o.kind!=="good"?`<p class="note">Better call: <span class="tag ${c.best}">${c.best.toUpperCase()}</span></p>`:""}
+        <div class="argnote">Argument ${o.arg}: <b>${a.title}</b></div>
+      </div>
+    </div>
+    <button class="primary" id="next">${nextLabel}</button>`;
+  if(!good){ const oc=document.getElementById("outcome"); oc.classList.add("shake"); }
+  const hb=document.getElementById("hint"); if(hb) hb.disabled=true;
+  const n=document.getElementById("next"); n.onclick=next; n.focus({preventScroll:true});
+  act.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth", block:"nearest"});
+}
+function next(){
+  if(ctx.mode==="tutorial"){ run=newRun(); renderLevelIntro(0); return; }
+  if(ctx.i<ctx.level.cases.length-1){ ctx.i++; renderCase(); }
+  else renderLevelDone(ctx.li);
+}
+
+/* ---------- level done ---------- */
+function levelStats(L){
+  let base=0; const t={good:0,missed:0,false:0,ok:0};
+  L.cases.forEach(id=>{ const d=run.dec[id]; if(!d)return; base+=d.base; if(d.kind==="good")t.good++; else if(d.kind==="missed"||d.kind==="late")t.missed++; else if(d.kind==="false")t.false++; else t.ok++; });
+  const pct=base/(L.cases.length*100);
+  const stars = pct>=.9?3:pct>=.6?2:pct>=.3?1:0;
+  return {t,stars};
+}
+function renderLevelDone(li){
+  stopTimer(); const L=LEVELS[li]; ctx={mode:"done",level:L,li};
+  run.levelDone=Math.max(run.levelDone,L.n); saveBest();
+  setBar(L);
+  const {t,stars}=levelStats(L);
+  const msg=["Rough shift. Every reviewer has one. That's why it can't be left to judgment alone.","You got some right, but the mistakes had real costs.","Solid shift. Most of your calls held up.","Perfect shift. You only reported when there was intent and a plan."][stars];
+  const lastLevel = li===LEVELS.length-1;
+  app.innerHTML=`
+  <section class="done enter">
+    <div><p class="label">Level ${L.n} complete · ${L.name}</p><h1>${msg}</h1></div>
+    <div class="stars" aria-label="${stars} of 3 stars">${[0,1,2].map(i=>starSVG(i<stars)).join("")}</div>
+    <section class="panel meters wide" aria-label="Three meters">${metersHTML()}</section>
+    <div class="split">
+      <div class="calls">
+        ${L.cases.map(id=>{ const d=run.dec[id], c=CASES[id]; return `<div class="call"><span><b>${esc(c.user)}</b> <span class="tag ${d.choice}">${d.timedOut?"TIMED OUT":d.choice.toUpperCase()}</span></span><span class="k ${d.kind}">${STAMP[d.kind].toUpperCase()}${d.hint?" · hint":""}</span></div>`; }).join("")}
+        <div class="row" style="margin-top:10px">
+          <button class="primary" id="cont">${lastLevel?"See what the rule would have done":"Next: "+LEVELS[li+1].name}</button>
+          <button class="ghost" id="retry">Replay this level</button>
+        </div>
+      </div>
+      ${postHTML()}
+    </div>
+  </section>`;
+  document.getElementById("cont").onclick=()=> lastLevel ? renderFinal() : renderLevelIntro(li+1);
+  document.getElementById("retry").onclick=()=>{
+    L.cases.forEach(id=>{ const d=run.dec[id]; if(d){ run.score-=d.total; delete run.dec[id]; } });
+    renderLevelIntro(li);
+  };
+  wirePost(); fillBoards();
+  document.getElementById("cont").focus({preventScroll:true});
+  window.scrollTo({top:0});
+}
+function saveBest(){ const b=store.get("md-best",null); if(b==null||run.score>b) store.set("md-best",run.score); }
+
+/* ---------- final ---------- */
+function epilogueHTML(){
+  const group=k=> (k==="missed"||k==="late")?"harm":k==="false"?"fr":"safe";
+  const label={harm:"People were hurt",fr:"Innocent, but police came",safe:"Safe"};
+  const items=ALL_IDS.filter(id=>run.dec[id]).map(id=>({id,d:run.dec[id],c:CASES[id],g:group(run.dec[id].kind)}));
+  const order={harm:0,fr:1,safe:2};
+  items.sort((a,b)=>order[a.g]-order[b.g]);
+  const n=g=>items.filter(x=>x.g===g).length;
+  return `<div class="epi">
+    <div><p class="label">One year later</p><h2>What happened to the people in your queue</h2></div>
+    <div class="episum">
+      <div class="harm"><span class="n">${n("harm")}</span><span class="label">Chats where people got hurt</span></div>
+      <div class="fr"><span class="n">${n("fr")}</span><span class="label">Innocent people police visited</span></div>
+      <div class="safe"><span class="n">${n("safe")}</span><span class="label">People safe or getting help</span></div>
+    </div>
+    <div class="epgrid">${items.map(x=>`<article class="epc ${x.g}">
+      <div class="who"><b>${esc(x.c.age?x.c.user+", "+x.c.age:x.c.user)}</b><span class="tag ${x.d.choice}">${x.d.timedOut?"TIMED OUT":"YOU: "+x.d.choice.toUpperCase()}</span></div>
+      <span class="k">${label[x.g]}</span>
+      <p>${esc(EPI[x.id][x.d.choice])}</p></article>`).join("")}</div>
+  </div>`;
+}
+function ruleCall(c){
+  const s=c.signals;
+  if(s.intent[0]==="yes"&&s.plan[0]==="yes") return "report";
+  if(Object.values(s).some(v=>v[0]==="unclear")) return "escalate";
+  return "ignore";
+}
+function renderFinal(){
+  stopTimer(); ctx={mode:"final"}; setBar(null);
+  document.getElementById("scorepill").hidden=false;
+  const t={good:0,missed:0,false:0};
+  ALL_IDS.forEach(id=>{ const d=run.dec[id]; if(!d)return; if(d.kind==="good")t.good++; else if(d.kind==="missed"||d.kind==="late")t.missed++; else if(d.kind==="false")t.false++; });
+  const rows=ALL_IDS.map(id=>{ const c=CASES[id], d=run.dec[id], r=ruleCall(c);
+    return `<tr><td><b>${esc(c.user)}</b></td><td>${V_LABEL[c.signals.intent[0]]}</td><td>${V_LABEL[c.signals.plan[0]]}</td><td class="mono">${c.score}%</td>
+      <td><span class="tag ${r}">${r.toUpperCase()}</span></td><td>${d?`<span class="tag ${d.choice}">${d.choice.toUpperCase()}</span>${d.choice===r?" ✓":""}`:"–"}</td></tr>`; }).join("");
+  const harmless=ALL_IDS.filter(id=>CASES[id].best==="ignore").sort((a,b)=>CASES[b].score-CASES[a].score).slice(0,2);
+  const threats=ALL_IDS.filter(id=>CASES[id].best==="report").sort((a,b)=>CASES[a].score-CASES[b].score).slice(0,2);
+  const nm=id=>`${CASES[id].user} ${CASES[id].score}%`;
+  const seen={1:[],2:[],3:[]};
+  ALL_IDS.forEach(id=>Object.values(CASES[id].out).forEach(o=>{ if(!seen[o.arg].includes(CASES[id].user)) seen[o.arg].push(CASES[id].user); }));
+  app.innerHTML=`
+  <section class="done enter">
+    <div><p class="label">All three shifts complete</p><h1>You made ${ALL_IDS.length} calls with no rule to follow.</h1></div>
+    <div class="tally">
+      <div class="tile s"><div class="n">${run.score}</div><div class="label">Final score</div></div>
+      <div class="tile g"><div class="n">${t.good}</div><div class="label">Right calls</div></div>
+      <div class="tile m"><div class="n">${t.missed}</div><div class="label">Missed or late</div></div>
+      <div class="tile f"><div class="n">${t.false}</div><div class="label">False reports</div></div>
+    </div>
+    <section class="panel meters wide" aria-label="Three meters">${metersHTML()}</section>
+    ${epilogueHTML()}
+    <div class="rule">
+      <p class="label">The rule we propose</p>
+      <h2>Report only when there is clear evidence of intent and planning.</h2>
+      <p>Not keywords. Not a risk score. Not dark feelings, songs or fiction. Unclear cases go to human review and support. Here is how that one rule would have sorted your shifts.</p>
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>User</th><th>Intent</th><th>Plan</th><th>Filter score</th><th>The rule says</th><th>You chose</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+    <p class="note">Some of the highest filter scores were harmless (${harmless.map(nm).join(", ")}). Some real threats scored lowest (${threats.map(nm).join(", ")}). A high threshold based on evidence works better than a filter.</p>
+    <div><p class="label" style="margin-bottom:10px">Why the duty has to exist</p>
+      <div class="args">${[1,2,3].map(n=>`<div class="arg"><span class="label">Argument ${n}</span><h3>${ARGS[n].title}</h3><p>${ARGS[n].body}</p><p class="seen">Seen in: ${seen[n].join(", ")}</p></div>`).join("")}</div></div>
+    <p class="close">Today, the only thing standing between Maya's warning and Monday morning is whether one reviewer happens to make the right call. That should not be left to luck. Governments should require AI companies to report credible threats of mass violence, and set the bar high enough to protect everyone else.</p>
+    <div class="split">
+      ${postHTML()}
+      <div class="row" style="align-self:start"><button class="primary" id="again">Play again</button><button class="ghost" id="tohome">Back to start</button></div>
+    </div>
+  </section>`;
+  document.getElementById("again").onclick=()=>{ run=newRun(); renderLevelIntro(0); };
+  document.getElementById("tohome").onclick=renderLanding;
+  wirePost(); fillBoards(); saveBest();
+  window.scrollTo({top:0});
+}
+
+/* ---------- scoreboard ---------- */
+let db=null, user=null, sbMode="loading", shared=[], sbTimer=null, postedName=store.get("md-name","");
+function postHTML(){
+  return `<div class="board">
+    <h3>Post your score</h3>
+    <p class="note">Your score shows up in the Top scores bar at the top of the page.</p>
+    ${`<form class="post" id="postform">
+      <div class="field"><label class="label" for="pname">Your name</label><input id="pname" maxlength="20" autocomplete="nickname" placeholder="e.g. Veronique" value="${esc(postedName)}"></div>
+      <button class="primary" type="submit" style="padding:10px 16px">Post ${run.score} pts</button>
+      <span class="postmsg" id="postmsg" role="status"></span></form>`}
+  </div>`;
+}
+function localScores(){ return store.get("md-scores",[]); }
+function entries(){
+  const list = sbMode==="shared" ? shared : localScores();
+  return [...list].sort((a,b)=>b.score-a.score).slice(0,10);
+}
+function fillBoards(){
+  const list=entries();
+  const top=document.getElementById("sbtop");
+  top.innerHTML="";
+  if(!list.length){ const s=document.createElement("span"); s.className="note"; s.textContent=sbMode==="loading"?"Loading…":"No scores yet. Be the first."; top.appendChild(s); }
+  list.slice(0,3).forEach((e,i)=>{
+    const s=document.createElement("span"); if(e.id===run.id) s.className="me";
+    const r=document.createElement("span"); r.className="r"; r.textContent=(i+1)+".";
+    const sc=document.createElement("span"); sc.className="s"; sc.textContent=Number(e.score)||0;
+    s.append(r, String(e.name||"Player").slice(0,20), sc); top.appendChild(s);
+  });
+  document.querySelectorAll(".sb-list").forEach(ol=>{
+    ol.innerHTML="";
+    if(!list.length){ const li=document.createElement("li"); li.innerHTML=`<span class="rk">–</span><span class="nm" style="font-weight:400;color:var(--muted)">No scores yet. Finish a level to post the first one.</span><span></span>`; ol.appendChild(li); return; }
+    list.forEach((e,i)=>{
+      const li=document.createElement("li"); if(e.id===run.id) li.className="me";
+      const rk=document.createElement("span"); rk.className="rk"; rk.textContent=i+1;
+      const nm=document.createElement("span"); nm.className="nm"; nm.textContent=String(e.name||"Player").slice(0,20);
+      const lv=document.createElement("span"); lv.className="lvl"; lv.textContent=`L${e.level||1}`; nm.appendChild(lv);
+      const sc=document.createElement("span"); sc.className="sc"; sc.textContent=Number(e.score)||0;
+      li.append(rk,nm,sc); ol.appendChild(li);
+    });
+  });
+  const modeText = sbMode==="shared"?"Shared with friends":sbMode==="loading"?"Loading…":"This device only";
+  const note = sbMode==="shared"?"Everyone with the link sees this board live."
+    : sbMode==="loading"?"Connecting to the shared board…"
+    : sbMode==="slow"?"The shared board can't be reached yet. Showing scores saved on this device."
+    : "Scores are saved on this device. Open the page in Claude to share a board with friends.";
+  document.querySelectorAll(".sb-mode").forEach(e=>e.textContent=modeText);
+  document.querySelectorAll(".sb-note").forEach(e=>e.textContent=note);
+}
+function wirePost(){
+  const f=document.getElementById("postform"); if(!f) return;
+  f.addEventListener("submit",async ev=>{
+    ev.preventDefault();
+    const name=document.getElementById("pname").value.trim().slice(0,20);
+    const msg=document.getElementById("postmsg");
+    if(!name){ msg.textContent="Type a name first."; return; }
+    postedName=name; store.set("md-name",name);
+    const row={name,score:run.score,level:run.levelDone||1,at:Date.now()};
+    const saveLocal=()=>{ const l=localScores().filter(e=>e.id!==run.id); l.push({id:run.id,...row}); store.set("md-scores",l.slice(-50)); };
+    if(db && sbMode==="shared"){
+      msg.textContent="Posting…";
+      try{ await db.collection("scores").doc(run.id).set(row); msg.textContent="Posted to the shared board."; }
+      catch(e){ saveLocal(); msg.textContent="Couldn't post to the shared board. You may need Contributor access from the page owner. Saved on this device instead."; fillBoards(); }
+    } else { saveLocal(); msg.textContent="Saved on this device."; fillBoards(); }
+  });
+}
+function initBoard(){
+  const use = window.claude && window.claude.use ? window.claude.use.bind(window.claude) : null;
+  if(!use){ sbMode="local"; fillBoards(); return; }
+  use("db").then(d=>{
+    if(!d){ sbMode="local"; fillBoards(); return; }
+    db=d;
+    sbTimer=setTimeout(()=>{ if(sbMode==="loading"){ sbMode="slow"; fillBoards(); } },10000);
+    d.collection("scores").orderBy("score","desc").limit(25).onSnapshot(snap=>{
+      shared=snap.docs.map(x=>({id:x.id,...x.data()}));
+      if(!snap.metadata.fromCache){ clearTimeout(sbTimer); }
+      sbMode="shared"; fillBoards();
+    },()=>{ clearTimeout(sbTimer); sbMode="local"; fillBoards(); });
+  }).catch(()=>{ sbMode="local"; fillBoards(); });
+}
+
+/* ---------- pixel-art room (200x120, scaled up crisp) ---------- */
+function drawRoom(cv,t){
+  const x=cv.getContext("2d"), s=+(document.documentElement.dataset.stakes||0);
+  const P={wall:["#272a30","#232d2e","#18303a","#172644","#101b37"][s],glass:["#20414b","#1a3a44","#13323c","#0f2644","#0b1d38"][s],
+    lamp:[.30,.24,.16,.09,.05][s],rain:[16,24,36,50,70][s]};
+  const R=(c,a,b,w,h)=>{x.fillStyle=c;x.fillRect(a,b,w,h);};
+  R(P.wall,0,0,200,120);
+  for(let i=0;i<200;i+=20) R("rgba(0,0,0,.13)",i,0,1,78);
+  R("#3a4f58",12,10,62,50); R(P.glass,15,13,56,44);
+  R("#0c1622",15,40,10,17); R("#0c1622",27,34,8,23); R("#0c1622",37,44,12,13); R("#0c1622",51,37,9,20); R("#0c1622",62,46,9,11);
+  [[18,43],[29,37],[29,41],[54,40],[54,45],[40,47],[64,49]].forEach(([a,b],i)=>R(s>1&&i%2?"#0c1622":"rgba(255,230,207,.6)",a,b,1,1));
+  x.fillStyle="rgba(196,220,230,.8)";
+  for(let i=0;i<P.rain;i++){ const rx=15+((i*37+((t/40)|0)*(i%3+1))%56), ry=13+((i*53+((t/22)|0)*(2+i%2))%44); x.fillRect(rx,ry,1,2+(i%2)); }
+  R("#3a4f58",42,13,2,44); R("#3a4f58",15,34,56,2); R("#2e3f47",10,60,66,3);
+  R("#2c3a40",150,14,30,24); R("#7F9C8B",153,17,24,18); R("#FFE6CF",158,21,6,6); R("#1F3470",166,26,8,6);
+  for(let y=58;y<78;y++){ const k=y-58; R(`rgba(255,230,207,${P.lamp})`,Math.round(44-k*.8),y,Math.round(12+k*1.3),1); }
+  for(let g=0;g<4;g++) R("rgba(241,235,225,.035)",66-g*4,26-g*3,70+g*8,50+g*6);
+  R("#4b5e66",0,78,200,2); R("#34454d",0,80,200,6); R("#222f35",0,86,200,34); R("#1a252a",0,86,200,1);
+  R("#2a3940",150,92,40,12); R("#2a3940",150,106,40,12); R("#7F9C8B",168,97,4,1); R("#7F9C8B",168,111,4,1);
+  R("#1B1F22",36,76,16,3); R("#1B1F22",42,56,2,20); R("#2b3238",40,52,18,5); R("#FFE6CF",42,57,14,1);
+  R("#1B1F22",68,26,66,46); R("#2b3238",96,72,10,6); R("#1B1F22",88,77,26,2);
+  R("#f1ebe1",71,29,60,40); R("#1F3470",71,29,60,5); R("#FFE6CF",73,31,22,1);
+  [[75,38,34,"#1F3470"],[75,43,44,"#6f7576"],[75,48,28,"#a3352b"],[75,53,40,"#6f7576"]].forEach(([a,b,w,c],i)=>R(i===2&&((t/450)|0)%2?"#ec8a73":c,a,b,w,2));
+  R("#ec8a73",125,47,3,4);
+  const ph=((t/260)|0)%3; for(let i=0;i<3;i++) R(i===ph?"#1B1F22":"#9aa0a0",76+i*4,61,2,2);
+  R("#2b3238",82,81,40,3); for(let i=0;i<9;i++) R("#3d464d",84+i*4,82,2,1); R("#2b3238",128,82,4,3);
+  R("#d9d0c3",12,81,22,3); R("#efe6d8",16,80,18,2);
+  R("#7F9C8B",142,71,8,8); R("#7F9C8B",150,73,2,4); R("#5e7a6b",142,71,8,1);
+  if(s<3){ const st=((t/320)|0)%4; R("rgba(236,229,218,.4)",144+(st%2),66-st,1,2); R("rgba(236,229,218,.4)",147-(st%2),64-((st+2)%4),1,2); }
+  R("#0E4A55",176,68,10,10); [[178,60],[181,57],[184,61],[176,63],[186,64],[180,63],[183,64]].forEach(([a,b])=>R("#7F9C8B",a,b,2,4));
+  if(s>0) R(`rgba(12,26,58,${s*.075})`,0,0,200,120);
+}
+let lastScene=-1e9;
+function loop(t){
+  if(!document.hidden){
+    if(t-lastScene>120){ lastScene=t; document.querySelectorAll("canvas.pxscene").forEach(cv=>drawRoom(cv,REDUCED?0:t)); }
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ---------- ambient sound: rain + a soft chord that loses a note after each bad call ---------- */
+const audio={ac:null,on:false,master:null,rain:null,padF:null,pad:[],
+  init(){
+    const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return false;
+    const ac=this.ac=new AC(); const m=this.master=ac.createGain(); m.gain.value=0; m.connect(ac.destination);
+    const len=ac.sampleRate*2, buf=ac.createBuffer(1,len,ac.sampleRate), d=buf.getChannelData(0); let last=0;
+    for(let i=0;i<len;i++){ const w=Math.random()*2-1; last=(last+.02*w)/1.02; d[i]=w*.35+last*3; }
+    const src=ac.createBufferSource(); src.buffer=buf; src.loop=true;
+    const hp=ac.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=380;
+    const lp=ac.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=2600;
+    this.rain=ac.createGain(); this.rain.gain.value=.03; src.connect(hp).connect(lp).connect(this.rain).connect(m); src.start();
+    this.padF=ac.createBiquadFilter(); this.padF.type="lowpass"; this.padF.frequency.value=1400; this.padF.connect(m);
+    [220,261.63,329.63,392,493.88].forEach((f,i)=>{ const o=ac.createOscillator(); o.type="triangle"; o.frequency.value=f; o.detune.value=(i-2)*4;
+      const g=ac.createGain(); g.gain.value=0; o.connect(g).connect(this.padF); o.start(); this.pad.push(g); });
+    return true;
+  },
+  toggle(){
+    if(!this.ac){ try{ if(!this.init()) return null; }catch(e){ return null; } }
+    this.on=!this.on; const t=this.ac.currentTime;
+    if(this.on){ this.ac.resume(); this.master.gain.setTargetAtTime(.7,t,.4); this.sync(); }
+    else this.master.gain.setTargetAtTime(0,t,.2);
+    return this.on;
+  },
+  sync(){
+    if(!this.ac) return;
+    const st=+(document.documentElement.dataset.stakes||0), bad=badCount(), t=this.ac.currentTime, voices=Math.max(1,5-bad);
+    this.pad.forEach((g,i)=>g.gain.setTargetAtTime(i<voices?.02:0,t,1.2));
+    this.padF.frequency.setTargetAtTime(Math.max(500,1400-bad*160),t,1);
+    this.rain.gain.setTargetAtTime(.025+st*.03,t,1.5);
+  },
+  blip(r){ if(!this.on) return; const ac=this.ac,t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();
+    o.type="square"; o.frequency.value=r==="u"?660:520; g.gain.setValueAtTime(.02,t); g.gain.exponentialRampToValueAtTime(.0001,t+.07);
+    o.connect(g).connect(this.master); o.start(t); o.stop(t+.08); },
+  thud(){ if(!this.on) return; const ac=this.ac,t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();
+    o.type="sine"; o.frequency.setValueAtTime(120,t); o.frequency.exponentialRampToValueAtTime(55,t+.35);
+    g.gain.setValueAtTime(.09,t); g.gain.exponentialRampToValueAtTime(.0001,t+.4); o.connect(g).connect(this.master); o.start(t); o.stop(t+.42); }
+};
+const sndBtn=document.getElementById("snd");
+sndBtn.onclick=()=>{ const on=audio.toggle(); if(on===null){ sndBtn.textContent="sound: n/a"; sndBtn.disabled=true; return; }
+  sndBtn.setAttribute("aria-pressed",on?"true":"false"); sndBtn.textContent=on?"sound: on":"sound: off"; };
+
+/* ---------- clear digits: wrap numbers in pixel-font text ---------- */
+const PIXEL_SEL="h1,h2,h3,.brand,.lv b,.im-title,.im-body,.checkpoint b,.q b,.duty b,.stamp,.close,.epc b";
+function fixDigits(root){
+  const els = root.nodeType===1 ? [ ...(root.matches(PIXEL_SEL)?[root]:[]), ...root.querySelectorAll(PIXEL_SEL) ] : [];
+  els.forEach(el=>{
+    const w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT), nodes=[];
+    while(w.nextNode()){ const n=w.currentNode; if(/\d/.test(n.nodeValue) && !(n.parentElement&&n.parentElement.classList.contains("dg"))) nodes.push(n); }
+    nodes.forEach(n=>{
+      const f=document.createDocumentFragment();
+      n.nodeValue.split(/(\d+)/).forEach(part=>{
+        if(!part) return;
+        if(/^\d+$/.test(part)){ const sp=document.createElement("span"); sp.className="dg"; sp.textContent=part; f.appendChild(sp); }
+        else f.appendChild(document.createTextNode(part));
+      });
+      n.replaceWith(f);
+    });
+  });
+}
+new MutationObserver(ms=>ms.forEach(m=>{
+  m.addedNodes.forEach(n=>{
+    if(n.nodeType===1){ if(!n.classList.contains("dg")) fixDigits(n.closest(PIXEL_SEL)||n); }
+    else if(n.nodeType===3 && n.parentElement && !n.parentElement.classList.contains("dg")){ const host=n.parentElement.closest(PIXEL_SEL); if(host) fixDigits(host); }
+  });
+})).observe(document.body,{childList:true,subtree:true});
+fixDigits(document.body);
+
+/* ---------- keys ---------- */
+document.addEventListener("keydown",e=>{
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  if(e.target && e.target.tagName==="INPUT") return;
+  const k=e.key.toLowerCase();
+  if((ctx.mode==="level"||ctx.mode==="tutorial") && !ctx.decided){
+    if(k==="r")decide("report",false); else if(k==="e")decide("escalate",false); else if(k==="i")decide("ignore",false); else if(k==="h")useHint();
+  }
+});
+document.getElementById("home").onclick=renderLanding;
+
+/* ---------- scoreboard panel toggle ---------- */
+const sbBtn=document.getElementById("sbtoggle"), sbPanel=document.getElementById("sbpanel");
+function setPanel(open){ sbPanel.hidden=!open; sbBtn.setAttribute("aria-expanded",open?"true":"false"); sbBtn.textContent=open?"Close board":"Full board"; }
+sbBtn.onclick=e=>{ e.stopPropagation(); setPanel(sbPanel.hidden); };
+document.addEventListener("click",e=>{ if(!sbPanel.hidden && !sbPanel.contains(e.target)) setPanel(false); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape" && !sbPanel.hidden){ setPanel(false); sbBtn.focus(); } });
+
+renderLanding();
+initBoard();
+</script>
+</body>
+</html>
